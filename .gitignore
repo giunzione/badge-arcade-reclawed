@@ -47,6 +47,7 @@ backup*/
 # ------------------------------------------------------------------
 # Generated patch: built by tools/build_ips.py, distributed via Releases
 build/
+dist/
 *.ips
 __pycache__/
 *.py[cod]

@@ -55,7 +55,7 @@ Badges you win **are not kept** yet. The original game stored your collection on
 ## Installation
 
 1. **Back up first** (recommended, not required). Use [Checkpoint](https://github.com/BernardoGiordano/Checkpoint) to back up the game's extdata. If you have badges in your HOME Menu badge box, also dump them with [Simple Badge Injector](https://github.com/AntiMach/simple-badge-injector): the patched game still runs its own badge-update step at boot, so it's worth keeping a copy. Neither tool is needed for the patch to work.
-2. Download the latest release and copy `luma/titles/0004000000153600/code.ips` to the root of your SD card.
+2. Download the zip for your region from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) (e.g. `badge-arcade-reclawed-EUR-….zip`) and extract it to the root of your SD card, so that you get `luma/titles/<title id>/code.ips`.
 3. Open the Luma3DS configuration menu (hold <kbd>SELECT</kbd> while powering on) and enable **"Enable game patching"**.
 4. Launch Nintendo Badge Arcade.
 
@@ -72,7 +72,7 @@ python3 tools/build_ips.py --set plays=25               # override a variable
 python3 tools/build_ips.py --set anchor_date=2018-07-20 # if your boss.sarc covers another week
 ```
 
-The output goes to `build/luma/titles/0004000000153600/code.ips`. If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
+The output goes to `build/<region>/luma/titles/<title id>/code.ips` (for EUR: `build/EUR/luma/titles/0004000000153600/code.ips`). If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
 
 ---
 
@@ -103,7 +103,7 @@ The game can't find a Nintendo Network ID. You are probably on a Pretendo accoun
 Your extdata doesn't contain `boss.sarc`. The patch can't provide machine data, because that data belongs to Nintendo.
 
 **Can you add other regions?**
-Possibly. It needs the `.code` of that region's v1.3.1 update to locate the same functions.
+Possibly. It needs the `.code` of that region's v1.3.1 update to locate the same functions. Contributions are welcome: add a `patches/<region>-v1.3.1.toml` with its own `[meta] region` and `title_id`, and CI will build it and ship it as a separate zip.
 
 **Only 10 plays? Why not 99?**
 The claw machines won’t let you leave while you still have unspent plays, so burning through 99 of them becomes a chore fast (trust me, I tried!)

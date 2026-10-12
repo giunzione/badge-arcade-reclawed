@@ -1,7 +1,7 @@
 name: Build patch
 
-# Builds the IPS from patches/*.toml on every push to main and on pull requests.
-# The status shows up as a check on each commit and as the badge in the README.
+# Builds every patch definition in patches/*.toml on each push to main and on
+# pull requests. The status shows up as a check on each commit and as the README badge.
 
 on:
   push:
@@ -29,17 +29,22 @@ jobs:
       - name: Check scripts compile
         run: python -m py_compile tools/*.py
 
-      - name: Build IPS (default vars)
-        run: python tools/build_ips.py
+      - name: Build all regions
+        run: .github/scripts/build_all.sh
 
-      - name: Build IPS (variable override smoke test)
-        run: python tools/build_ips.py --set plays=99 --out /tmp/smoke/code.ips
+      - name: Variable override smoke test
+        run: |
+          for f in patches/*.toml; do
+            python tools/build_ips.py --patch "$f" --set plays=99 --out "/tmp/smoke/$(basename "$f" .toml).ips"
+          done
 
       - name: Validate IPS structure
         run: |
-          python - <<'EOF'
-          import pathlib, sys
-          for p in pathlib.Path("build").rglob("*.ips"):
+          python - <<'PY'
+          import pathlib
+          files = list(pathlib.Path("build").rglob("*.ips"))
+          assert files, "no IPS produced"
+          for p in files:
               d = p.read_bytes()
               assert d[:5] == b"PATCH" and d[-3:] == b"EOF", f"{p}: bad header/footer"
               i, n = 5, 0
@@ -50,15 +55,10 @@ jobs:
                   n += 1
               assert i == len(d) - 3, f"{p}: trailing data"
               print(f"{p}: OK, {n} records, {len(d)} bytes")
-          EOF
-
-      - name: Package
-        run: |
-          cd build
-          zip -r ../badge-arcade-reclawed.zip luma
+          PY
 
       - uses: actions/upload-artifact@v4
         with:
           name: badge-arcade-reclawed-${{ github.sha }}
-          path: badge-arcade-reclawed.zip
+          path: dist/*.zip
           if-no-files-found: error

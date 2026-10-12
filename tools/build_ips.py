@@ -6,7 +6,7 @@ The patch itself lives in patches/*.toml; this script only reads, assembles and
 packs it. You never need to edit this file to change the patch.
 
 Usage:
-    python3 tools/build_ips.py                                  # patches/eur-v1.3.1.toml
+    python3 tools/build_ips.py                                  # patches/eur-v1.3.1.toml -> build/EUR/...
     python3 tools/build_ips.py --set plays=25                   # override a [vars] value
     python3 tools/build_ips.py --set anchor_date=2018-07-20
     python3 tools/build_ips.py --check code.bin                 # verify against YOUR decompressed .code
@@ -152,13 +152,14 @@ def main():
     if errors:
         sys.exit(f'\n{errors} mismatch(es): wrong game region or version? Nothing written.')
 
-    out = a.out or os.path.join(ROOT, 'build', 'luma', 'titles', meta.get('title_id', 'unknown'), 'code.ips')
+    region = meta.get('region', 'unknown')
+    out = a.out or os.path.join(ROOT, 'build', region, 'luma', 'titles', meta.get('title_id', 'unknown'), 'code.ips')
     ips = build_ips(records, base)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, 'wb') as f:
         f.write(ips)
     shown = ', '.join(f'{k}={vars_[k]}' for k in spec.get('vars', {}))
-    print(f'\nWrote {out} ({len(ips)} bytes; {shown})')
+    print(f'\nWrote {out} ({region}, {len(ips)} bytes; {shown})')
 
 
 if __name__ == '__main__':

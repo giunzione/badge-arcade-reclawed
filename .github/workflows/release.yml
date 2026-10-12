@@ -1,6 +1,7 @@
 name: Release
 
-# Builds the IPS and attaches the ready-to-extract zip to a GitHub Release.
+# Builds every patches/*.toml and attaches one ready-to-extract zip per region
+# (badge-arcade-reclawed-<REGION>-<tag>.zip) to a GitHub Release.
 #
 # Two ways to trigger it:
 #   1. From the browser: Releases -> "Draft a new release" -> create a tag (e.g. v0.1.0-beta)
@@ -36,27 +37,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Build IPS
-        run: python tools/build_ips.py
-
-      - name: Package
-        run: |
-          cd build
-          zip -r "../badge-arcade-reclawed-${GITHUB_REF_NAME}.zip" luma
+      - name: Build all regions
+        run: .github/scripts/build_all.sh "$GITHUB_REF_NAME"
 
       # Release created in the browser: attach the zip to it.
       - if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: badge-arcade-reclawed-${{ github.ref_name }}.zip
+          files: dist/*.zip
           overwrite_files: true
 
       # Tag pushed from a terminal: create the release.
       - if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          files: badge-arcade-reclawed-${{ github.ref_name }}.zip
+          files: dist/*.zip
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           overwrite_files: true
