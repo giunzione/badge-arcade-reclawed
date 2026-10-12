@@ -39,6 +39,10 @@ I wanted to see how far a purely client-side approach could go, with no server a
 
 Badges you win **are not kept** yet. The original game stored your collection on Nintendo's servers, and making it persistent locally is the next milestone.
 
+> [!NOTE]
+> So far the patch has been tested on **a single console**. The code changes don't depend on the hardware model, but setups different from mine (another SpotPass week in `boss.sarc`, no previous save data, no NNID) haven't been tried yet. \
+> If you try it, please [open an issue](https://github.com/giunzione/badge-arcade-reclawed/issues) and say whether it worked, with your console model and Luma3DS version.
+
 ---
 
 ## Requirements
@@ -58,6 +62,9 @@ Badges you win **are not kept** yet. The original game stored your collection on
 2. Download the zip for your region from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) (e.g. `badge-arcade-reclawed-EUR-….zip`) and extract it to the root of your SD card, so that you get `luma/titles/<title id>/code.ips`.
 3. Open the Luma3DS configuration menu (hold <kbd>SELECT</kbd> while powering on) and enable **"Enable game patching"**.
 4. Launch Nintendo Badge Arcade.
+
+> [!TIP]
+> The game takes **a long time to load**, especially on the title screen. Don't panic: it isn't frozen, just give it a moment.
 
 To uninstall, delete `code.ips`. The installed game is never modified.
 
