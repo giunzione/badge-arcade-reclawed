@@ -1,0 +1,60 @@
+# ------------------------------------------------------------------
+# Nintendo-owned files: NEVER commit these.
+# The repo only ships our own patch bytes and scripts; users dump
+# their own game files from their own console.
+# ------------------------------------------------------------------
+
+# Game code and headers
+code.bin
+.code
+*.code
+code_dec.bin
+code_patched.bin
+exheader.bin
+extheader.bin
+*.cxi
+*.cia
+*.3ds
+*.app
+*.tmd
+
+# RomFS / SpotPass / extdata content
+*.sarc
+*.szs
+*.msbt
+*.msbf
+*.msflow
+*.bcsar
+*.bch
+*.bcstm
+*.dat
+savedata
+addSaveData
+boss/
+allbadge/
+romfs/
+exefs/
+
+# Badge dumps (Simple Badge Injector / Checkpoint / GodMode9)
+SimpleBadgeInjector/
+Checkpoint/
+gm9/
+dumps/
+backup*/
+
+# ------------------------------------------------------------------
+# Build / tooling noise
+# ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.zip
+out*/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
