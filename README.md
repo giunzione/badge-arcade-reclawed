@@ -37,7 +37,7 @@ I wanted to see how far a purely client-side approach could go, with no server a
 | Keeping newly won badges after closing the game | ✅ Working. Stored in the game's extdata as `reclawed`, see [docs/05-home-badges.md](docs/05-home-badges.md) |
 | Theme shop, Miiverse gallery, info corner | ❔ Untested |
 
-The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead. Badges you win show up in the badge book right away, and in the HOME Menu badge box after you launch the game again.
+The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead, and sends the badges you win to the HOME Menu badge box at the end of each crane session.
 
 > [!NOTE]
 > So far the patch has been tested on **a single console**. The code changes don't depend on the hardware model, but setups different from mine (another SpotPass week in `boss.sarc`, no previous save data, no NNID) haven't been tried yet. \
@@ -111,6 +111,12 @@ Your extdata doesn't contain `boss.sarc`. The patch can't provide machine data, 
 
 **Can you add other regions?**
 Possibly. It needs the `.code` of that region's v1.3.1 update to locate the same functions. Contributions are welcome: add a `patches/<region>-v1.3.1.toml` with its own `[meta] region` and `title_id`, and CI will build it and ship it as a separate zip.
+
+**I won a badge but it's not in the HOME Menu badge box.**
+Open the badge book in the game once, then check the badge box again. If you close the game first, the badges are added the next time you launch it.
+
+**The badges in the HOME Menu are in a strange order.**
+They are placed in the order you won them, not grouped by set. Nothing is lost, you can move them around in the badge box.
 
 **Only 10 plays? Why not 99?**
 The claw machines won’t let you leave while you still have unspent plays, so burning through 99 of them becomes a chore fast (trust me, I tried!)

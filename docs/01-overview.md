@@ -39,7 +39,7 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | 6 | `0x2EFB70`–`0x2EFB80` | 5 instructions | Hall: set network mode to 2 and jump to the "login OK" branch |
 | 7 | `0x2DFD2C`, `0x2DFD48` | `mov r0,#10` | Crane: read `Bonus_FreePlaySum` as 10 |
 | 8 | `0x304E88` | `mov r0,#1` | Practice Catcher: start request returns *success* |
-| 9 | `0x2E1490` | `mov r0,#1` | Crane: end-of-session save returns *success* |
+| 9 | `0x2E1490` | `bl` cave | Crane: end-of-session save returns *success* and exports won badges to the HOME Menu |
 | 10 | `0x305640` | `mov r0,#1` | Practice Catcher: result save returns *success* |
 | 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule |
 | 12 | `0x2CDDB4` → `0x3D7A20` | call + cave | After each `savedata` write, save the progress blob to `extdata:/reclawed` |

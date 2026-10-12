@@ -74,7 +74,8 @@ The server never held anything special: it stored one **signed progress blob** t
 The patch keeps the blob in a file in the game's own extdata:
 
 - **Save:** every time the save manager writes `savedata` (`bl 0x2CE850` at `0x2CDDB4`), a cave builds the blob with `0x24A63C` and writes `[len][blob]` to `extdata:/reclawed`.
-- **Load:** title state `0x28` (where the NEX download used to start) reads the file and passes it to `0x239E78`, then continues to *WritingData* (`0x33`). States `0x33`/`0x35` export the list to the HOME Menu, so a badge won in one session appears in the HOME badge box after the **next** launch.
+- **Load:** title state `0x28` (where the NEX download used to start) reads the file and passes it to `0x239E78`, then continues to *WritingData* (`0x33`). States `0x33`/`0x35` export the list to the HOME Menu at boot.
+- **HOME export after a session:** online, the request status function `0x253798` itself exported the prizes (`0x2412F4([0x42BE3C], 0)`) once the server confirmed the end-of-session request. The patch replaces that status call at `0x2E1490` with a cave that runs the same export and reports success. The export is queued as a task: in practice the badge box shows the new badges after the badge book has been opened once, or after the next launch. Badges are placed in the order they were won, not grouped by set.
 
 Three details only showed up on hardware:
 
