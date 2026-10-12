@@ -130,3 +130,4 @@ The idea, direction and all testing on real hardware are mine; the reverse engin
 ## License
 
 [MIT](LICENSE), covering the patch and scripts in this repository only.
+If you build on this work or share it, a credit or a link back to this repository is appreciated!
