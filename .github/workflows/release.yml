@@ -1,17 +1,26 @@
 name: Release
 
-# Pushing a tag like v0.1.0 builds the IPS and publishes a GitHub Release
-# with the ready-to-extract zip attached. Tags with a hyphen (v0.2.0-beta)
-# are marked as pre-releases.
+# Builds the IPS and attaches the ready-to-extract zip to a GitHub Release.
 #
-#   git tag v0.1.0 && git push origin v0.1.0
+# Two ways to trigger it:
+#   1. From the browser: Releases -> "Draft a new release" -> create a tag (e.g. v0.1.0-beta)
+#      -> Publish. The zip is attached automatically a minute later.
+#   2. From a terminal:  git tag v0.1.0-beta && git push origin v0.1.0-beta
+#      (creates the release itself; tags containing a hyphen become pre-releases)
 
 on:
+  release:
+    types: [published]
   push:
     tags: ["v*"]
 
 permissions:
   contents: write
+
+# A release created in the browser can fire both triggers: run them one at a time.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -35,8 +44,19 @@ jobs:
           cd build
           zip -r "../badge-arcade-reclawed-${GITHUB_REF_NAME}.zip" luma
 
-      - uses: softprops/action-gh-release@v2
+      # Release created in the browser: attach the zip to it.
+      - if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: badge-arcade-reclawed-${{ github.ref_name }}.zip
+          overwrite_files: true
+
+      # Tag pushed from a terminal: create the release.
+      - if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
         with:
           files: badge-arcade-reclawed-${{ github.ref_name }}.zip
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+          overwrite_files: true
