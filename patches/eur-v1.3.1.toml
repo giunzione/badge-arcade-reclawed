@@ -104,8 +104,8 @@ description = "Practice Catcher start request (type 0x81)"
 [[patch]]
 address     = 0x2E1490
 original    = "bl #0x253798"
-asm         = "mov r0, #1"
-description = "Crane end-of-session save (type 0x61 / 0x800)"
+asm         = "bl #0x3d7a28"
+description = "Crane end-of-session save (type 0x61 / 0x800): success, and export won badges to HOME (cave)"
 
 [[patch]]
 address     = 0x305640
@@ -202,6 +202,20 @@ require_empty = true
 asm         = """
     b save_hook               @ 0x3D7A20, from 0x2CDDB4
     b load_hook               @ 0x3D7A24, from 0x33F880
+    b export_hook             @ 0x3D7A28, from 0x2E1490
+
+@ --- crane end of session: the real status function 0x253798 exported the
+@ prizes to HOME (0x2412F4(badgeMgr, 0)) once the server answered. We skip the
+@ server, so report success and run that export ourselves. -----------------
+export_hook:
+    push {r4, lr}
+    ldr r0, p_badgemgr
+    ldr r0, [r0]
+    cmp r0, #0
+    movne r1, #0
+    blne #0x2412f4
+    mov r0, #1                 @ request status: success
+    pop {r4, pc}
 
 @ --- replaces "bl 0x2CE850" (savedata writer) ------------------------------
 save_hook:
@@ -401,6 +415,7 @@ finish:
     pop {r0, pc}
 
 p_game:      .word 0x42be68
+p_badgemgr:  .word 0x42be3c
 p_archives:  .word 0x450790
 p_names:     .word 0x42c140     @ [0] = save manager
 p_handle_vt: .word 0x40ec74
