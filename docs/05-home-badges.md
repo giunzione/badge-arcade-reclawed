@@ -46,7 +46,7 @@ The badges you own were **stored on Nintendo's servers**. At boot the game downl
 - `0x2412F4(mgr, 1)`: *export all prizes*
 - `0x241204(mgr)`: *export own prizes*
 
-Offline, the in-memory list starts empty. Won badges are added to it during the session, and the stemmario (badge book) can show them. Nothing writes them to local storage, though, so they are gone after a restart.
+Offline, the in-memory list starts empty. Won badges are added to it during the session (`0x258D70`). Online they were then synced to the server; offline the persistence patch below keeps them in a local file.
 
 ## Debug menu
 
@@ -61,10 +61,40 @@ A developer menu table at `0x42D4B0` (entries are `{handler, 0, name, 0}`) is st
 | Load Boss Data from SD | `0x300674` | |
 | Delete Management File | `0x300888` | |
 
-## Planned: local persistence
+## Local persistence
 
-`0x24A63C` produces the same blob the game uploaded to the server. The plan:
+The server never held anything special: it stored one **signed progress blob** that the game itself produced, and handed it back at boot.
 
-1. Where the game uploaded, serialize the blob and write it to a file on the SD card.
-2. At boot, where it downloaded, read that file and feed it to the matching deserializer (not located yet).
-3. States `0x33`/`0x35` will then export real ownership data to the HOME Menu with the official images, sets and shortcuts.
+| Function | Role |
+|---|---|
+| `0x24A63C(game, &out, &len)` | Builds the blob at `game+0x418`: format version, two counters (`+0x71A38`, `+0x71A3C`), the own-badge list (`[game+0x71A54]`, MessagePack with the keys `PrizeNodes`, `PrizeCounts`, `OwnedBookPages`), two lists of id/value pairs, then a 32-byte HMAC-SHA256 (`0x24BA10`, key in rodata) |
+| `0x239E78(game, buf, len)` | The inverse: checks the HMAC, restores the counters, the list (`0x24A844`) and the pairs. Called by the title after the NEX download (`0x33FBF4`) |
+| `0x24A594(mgr, req, buf, len)` | Queues a full upload. Offline it is **not** reached during normal play: winning a badge only adds it to the in-memory list (`0x255E04`), and the end of a crane session sends a small result request, not the blob |
+
+The patch keeps the blob in a file in the game's own extdata:
+
+- **Save:** every time the save manager writes `savedata` (`bl 0x2CE850` at `0x2CDDB4`), a cave builds the blob with `0x24A63C` and writes `[len][blob]` to `extdata:/reclawed`.
+- **Load:** title state `0x28` (where the NEX download used to start) reads the file and passes it to `0x239E78`, then continues to *WritingData* (`0x33`). States `0x33`/`0x35` export the list to the HOME Menu, so a badge won in one session appears in the HOME badge box after the **next** launch.
+
+Three details only showed up on hardware:
+
+1. **The game saves before it loads.** `savedata` is written during boot, before state `0x28`. Saving the blob then would overwrite the file with an empty list. Saves are skipped until the load has run; the flag lives in the unused tail of the `.bss` page (`0x4CBFF0`), which is zero at boot.
+2. **Unwritten extdata blocks don't read back.** A file created at a fixed size and only partly written fails to read. The whole file (`0x49000` bytes) is written every time.
+3. **The upload path is the wrong hook** (see `0x24A594` above).
+
+File helpers (members of the archive returned by `0x25B6EC([0x450790], 2)`, same calls as the `savedata` writer `0x2CE850`):
+
+| Address | Call |
+|---|---|
+| `0x25E12C` / `0x25DFD8` | Guard: mounts `extdata:` if needed, unmounts on release |
+| `0x270EC4` | Open (`mode` 0 read, 1 write) |
+| `0x25B09C` | Create `extdata:/<name>` with a fixed size (`[0x42C140]` is the save manager) |
+| `0x2727F0` / `0x270DC8` | Read / write |
+| `0x272908` | Close |
+
+The blob is built in the upload buffer at `game+0x418`; the word before it is borrowed for the length header and restored. The game's extdata allows 16 files and uses four (`savedata`, `addSaveData`, `boss.sarc`, `allbadge.sarc`). A missing or damaged file fails the HMAC check and the game starts with an empty list.
+
+### Save data layout notes
+
+- `savedata` (`0xE4D8` bytes) is loaded into the save manager at `+0x88` and written from a second copy at `+0xE560` (`0x2CE3xx` / `0x2CE850`).
+- `addSaveData` (`0x1400` bytes): version (`3`), 100 four-byte per-day entries (year−2000, month, day, count; `0x253644`), and a set of up to 1024 ids at `+0x198` with its count at `+0x1198` (add `0x258B4C`, remove `0x258A3C`, contains `0x258CE4`). It has no room for the badge list.

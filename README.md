@@ -34,10 +34,10 @@ I wanted to see how far a purely client-side approach could go, with no server a
 | Practice Catcher (bonus machine) | ✅ Working |
 | Daily machine rotation, with the real system clock | ✅ Working |
 | *Extra:* restoring old badges to the HOME Menu badge box | ✅ Optional side tool, [`tools/restore_badges.py`](tools/restore_badges.py) |
-| Keeping newly won badges after closing the game | ❌ Not yet. See [docs/05-home-badges.md](docs/05-home-badges.md) |
+| Keeping newly won badges after closing the game | ✅ Working. Stored in the game's extdata as `reclawed`, see [docs/05-home-badges.md](docs/05-home-badges.md) |
 | Theme shop, Miiverse gallery, info corner | ❔ Untested |
 
-Badges you win **are not kept** yet. The original game stored your collection on Nintendo's servers, and making it persistent locally is the next milestone.
+The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead. Badges you win show up in the badge book right away, and in the HOME Menu badge box after you launch the game again.
 
 > [!NOTE]
 > So far the patch has been tested on **a single console**. The code changes don't depend on the hardware model, but setups different from mine (another SpotPass week in `boss.sarc`, no previous save data, no NNID) haven't been tried yet. \

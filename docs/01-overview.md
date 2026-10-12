@@ -32,7 +32,7 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | # | Address | Change | Purpose |
 |---|---|---|---|
 | 1 | `0x33D3C8` | `mov r0,#0x26` | Title: after save-data load go to *LoadingData* instead of *ConnectingNetwork* |
-| 2 | `0x33F880` | `mov r0,#0x33` | Title: after local load go to *WritingData* instead of the NEX download |
+| 2 | `0x33F880` | `bl` cave | Title: load saved progress, then go to *WritingData* instead of the NEX download |
 | 3 | `0x34111C` | `nop` | Title: never enter *DataSalvage* (it needs the server) |
 | 4 | `0x34140C` | `mov r0,#0x39` | Title: skip the NEX upload of recovery plays |
 | 5 | `0x3412EC` | `mov r0,#0x39` | Title: local-data validation path goes to final setup |
@@ -42,7 +42,8 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | 9 | `0x2E1490` | `mov r0,#1` | Crane: end-of-session save returns *success* |
 | 10 | `0x305640` | `mov r0,#1` | Practice Catcher: result save returns *success* |
 | 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule |
+| 12 | `0x2CDDB4` → `0x3D7A20` | call + cave | After each `savedata` write, save the progress blob to `extdata:/reclawed` |
 
-Patch 11's cave lives in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable.
+Patch 11's and 12's caves live in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable.
 
 Details for each are on the following pages.

@@ -37,8 +37,8 @@ description = "Title state 0x04: after save-data load go to LoadingData (0x26), 
 [[patch]]
 address     = 0x33F880
 original    = "mov r0, #0x2b"
-asm         = "mov r0, #0x33"
-description = "Title state 0x28: after local load go to WritingData (0x33), not the NEX download (0x2B)"
+asm         = "bl #0x3d7a24"
+description = "Title state 0x28: load saved badges (cave returns 0x33), then WritingData instead of the NEX download (0x2B)"
 
 [[patch]]
 address     = 0x34111C
@@ -161,3 +161,253 @@ anc_hi: .word ${anchor_ms_hi}
 week:   .word ${week_ms}
 """
 description = "Clock remap cave (in .text padding), anchor ${anchor_date}"
+
+# ---------------------------------------------------------------------------
+# Local persistence of won badges
+#
+# Online, the server kept one signed progress blob: counters plus the own-badge
+# list (MessagePack: PrizeNodes / PrizeCounts / OwnedBookPages) and an HMAC.
+# The game builds it with 0x24A63C(game, &buf, &len) and, at boot, parsed the
+# downloaded copy with 0x239E78(game, buf, len).
+#
+# Offline we keep that blob in a file in the game's own extdata:
+#   save: every time the save manager writes "savedata" (call at 0x2CDDB4),
+#         build the blob with 0x24A63C and write [len][blob] to extdata:/reclawed
+#   load: title state 0x28 (where the NEX download used to start) reads the
+#         file and hands it to 0x239E78; states 0x33/0x35 then export to HOME
+#
+# Details that matter (found on hardware):
+# - The game writes savedata at boot before state 0x28. Saving then would
+#   overwrite the file with an empty list, so saves are skipped until the load
+#   has run (flag in the unused tail of the .bss page, 0x4CBFF0, zero at boot).
+# - Extdata files have a fixed size and blocks never written fail to read back,
+#   so the whole file (0x49000 bytes) is written every time.
+# - The blob lives at gGameData+0x418 (the upload buffer). The word before it
+#   is borrowed for the length header and restored right after.
+# - File helpers are the game's own, as used for "savedata" by 0x2CE850:
+#   0x25B6EC(archives, 2) extdata archive, 0x270EC4 open, 0x2727F0 read,
+#   0x270DC8 write, 0x272908 close, 0x25B09C create, 0x25E12C/0x25DFD8 guard.
+# - A missing or damaged file fails the HMAC check in 0x239E78 and is ignored.
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2CDDB4
+original    = "bl #0x2ce850"
+asm         = "bl #0x3d7a20"
+description = "Save manager: after writing savedata, also save the progress blob"
+
+[[patch]]
+address     = 0x3D7A20
+require_empty = true
+asm         = """
+    b save_hook               @ 0x3D7A20, from 0x2CDDB4
+    b load_hook               @ 0x3D7A24, from 0x33F880
+
+@ --- replaces "bl 0x2CE850" (savedata writer) ------------------------------
+save_hook:
+    push {r4, lr}
+    bl #0x2ce850
+    mov r4, r0                 @ keep the writer's result
+    sub sp, sp, #8
+    ldr r0, p_flag
+    ldr r0, [r0]
+    cmp r0, #0
+    beq h_out                  @ boot load not done yet: don't overwrite the file
+    ldr r0, p_game
+    ldr r0, [r0]
+    cmp r0, #0
+    beq h_out
+    mov r1, #0
+    str r1, [sp]
+    str r1, [sp, #4]
+    mov r1, sp
+    add r2, sp, #4
+    bl #0x24a63c               @ [sp] = blob, [sp+4] = len
+    cmp r0, #0
+    beq h_out
+    ldr r0, [sp]
+    ldr r1, [sp, #4]
+    bl save_blob
+h_out:
+    add sp, sp, #8
+    mov r0, r4
+    pop {r4, pc}
+
+@ --- title state 0x28: returns r0 = 0x33 (next state) --------------------
+load_hook:
+    push {r4, lr}
+    ldr r0, p_game
+    ldr r0, [r0]
+    add r0, r0, #0x400
+    add r0, r0, #0x18
+    bl load_blob
+    ldr r1, p_flag
+    mov r0, #1
+    str r0, [r1]               @ saves may now overwrite the file
+    mov r0, #0x33
+    pop {r4, pc}
+
+@ --- save_blob / load_blob share one frame layout (same as 0x2CE850) -----
+@ [sp] [sp+4] stack args, [sp+8..0x37] file handle, [sp+0x38] guard,
+@ [sp+0x40] path {vtable, name}, [sp+0x50] byte count; r6 archive, r7 file
+
+save_blob:                     @ r0 = blob, r1 = len
+    push {r4, r5, r6, r7, r8, lr}
+    sub sp, sp, #0x58
+    mov r4, r0
+    mov r5, r1
+    ldr r0, max_len
+    cmp r5, r0
+    bhi s_out
+    cmp r5, #0x24
+    blo s_out
+    add r0, sp, #0x38
+    bl #0x25e12c               @ guard on (mounts extdata if needed)
+    bl prep
+    mov r0, r6
+    add r1, sp, #8
+    add r2, sp, #0x40
+    mov r3, #1
+    mov ip, #0
+    str ip, [sp]
+    bl #0x270ec4               @ open for write
+    movs r7, r0
+    bne s_write
+    ldr r0, p_names
+    ldr r0, [r0]
+    adr r1, fname
+    ldr r2, file_size
+    mov r3, #0
+    bl #0x25b09c               @ create (fixed size)
+    cmp r0, #0
+    beq s_done
+    mov r0, r6
+    add r1, sp, #8
+    add r2, sp, #0x40
+    mov r3, #1
+    mov ip, #0
+    str ip, [sp]
+    bl #0x270ec4
+    movs r7, r0
+    beq s_done
+s_write:
+    ldr r8, [r4, #-4]          @ borrow the word before the blob
+    str r5, [r4, #-4]          @ header = len
+    ldr r0, file_size          @ write the whole file, never leave unwritten blocks
+    str r0, [sp]
+    mov r0, #0
+    str r0, [sp, #4]
+    mov r0, r7
+    add r1, sp, #0x50
+    add r2, sp, #8
+    sub r3, r4, #4
+    bl #0x270dc8
+    str r8, [r4, #-4]          @ give the word back
+    mov r0, r7
+    add r1, sp, #8
+    bl #0x272908               @ close
+s_done:
+    bl finish
+s_out:
+    add sp, sp, #0x58
+    pop {r4, r5, r6, r7, r8, pc}
+
+load_blob:                     @ r0 = buffer (gGameData+0x418)
+    push {r4, r5, r6, r7, r8, lr}
+    sub sp, sp, #0x58
+    mov r4, r0
+    mov r5, #0                 @ len, 0 = nothing to parse
+    add r0, sp, #0x38
+    bl #0x25e12c
+    bl prep
+    mov r0, r6
+    add r1, sp, #8
+    add r2, sp, #0x40
+    mov r3, #0
+    str r3, [sp]
+    bl #0x270ec4               @ open for read
+    movs r7, r0
+    beq l_done
+    ldr r8, [r4, #-4]
+    ldr r0, file_size
+    str r0, [sp]
+    mov r0, #0
+    str r0, [sp, #4]
+    str r0, [sp, #0x50]
+    mov r0, r7
+    add r1, sp, #0x50
+    add r2, sp, #8
+    sub r3, r4, #4
+    bl #0x2727f0               @ read the whole file
+    cmp r0, #0
+    beq l_close
+    ldr r0, [sp, #0x50]
+    ldr r1, file_size
+    cmp r0, r1
+    ldreq r5, [r4, #-4]        @ len from header
+l_close:
+    str r8, [r4, #-4]
+    mov r0, r7
+    add r1, sp, #8
+    bl #0x272908
+l_done:
+    bl finish
+    ldr r0, max_len
+    cmp r5, r0
+    bhi l_out
+    cmp r5, #0x24
+    blo l_out
+    ldr r0, p_game
+    ldr r0, [r0]
+    mov r1, r4
+    mov r2, r5
+    bl #0x239e78               @ parse: HMAC check, counters, own-badge list
+l_out:
+    add sp, sp, #0x58
+    pop {r4, r5, r6, r7, r8, pc}
+
+@ shared: archive + empty file handle + path, in the caller's frame
+prep:
+    push {r0, lr}              @ caller's sp+N is sp+N+8 here
+    ldr r0, p_archives
+    ldr r0, [r0]
+    mov r1, #2
+    bl #0x25b6ec
+    mov r6, r0
+    ldr r0, p_handle_vt
+    str r0, [sp, #0x10]
+    mov r0, #0
+    add r1, sp, #0x14
+    mov r2, #11
+p_zero:
+    str r0, [r1], #4
+    subs r2, r2, #1
+    bne p_zero
+    ldr r0, p_path_vt
+    str r0, [sp, #0x48]
+    adr r0, fname
+    str r0, [sp, #0x4c]
+    pop {r0, pc}
+
+@ shared: handle destructor + guard off (as at the end of 0x2CE850)
+finish:
+    push {r0, lr}
+    ldr r0, [sp, #0x18]
+    cmp r0, #0
+    addne r1, sp, #0x10
+    blne #0x272908
+    add r0, sp, #0x40
+    bl #0x25dfd8
+    pop {r0, pc}
+
+p_game:      .word 0x42be68
+p_archives:  .word 0x450790
+p_names:     .word 0x42c140     @ [0] = save manager
+p_handle_vt: .word 0x40ec74
+p_path_vt:   .word 0x40f598
+p_flag:      .word 0x4cbff0     @ free word after .bss (same page, zero at boot)
+file_size:   .word 0x49000      @ read lands in gGameData+0x414..0x49414 (upload buffer)
+max_len:     .word 0x48ffc
+fname:       .word 0x6c636572, 0x64657761, 0     @ "reclawed"
+"""
+description = "Badge persistence cave: save/load the progress blob to extdata:/reclawed"
