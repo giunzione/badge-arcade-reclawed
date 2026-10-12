@@ -45,6 +45,9 @@ backup*/
 # ------------------------------------------------------------------
 # Build / tooling noise
 # ------------------------------------------------------------------
+# Generated patch: built by tools/build_ips.py, distributed via Releases
+build/
+*.ips
 __pycache__/
 *.py[cod]
 .venv/

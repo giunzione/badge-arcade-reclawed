@@ -1,0 +1,4 @@
+# Needed only to build the patch from source (tools/build_ips.py).
+# tools/restore_badges.py uses the standard library only.
+# Python 3.11+ is required (tomllib).
+keystone-engine>=0.9.2

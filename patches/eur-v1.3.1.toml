@@ -1,0 +1,161 @@
+# Badge Arcade Reclawed - patch definition
+#
+# Target: Nintendo Badge Arcade EUR v1.3.1
+#   base title   0004000000153600
+#   update title 0004000E00153600 (its .code is the one that runs)
+#
+# Addresses are virtual addresses in the decompressed .code (text base 0x100000).
+# `original` is optional; when present, `build_ips.py --check` verifies it against
+# your own dumped code before writing anything.
+#
+# `asm` may reference variables from [vars] as ${name}. Values can be overridden on
+# the command line:  python3 tools/build_ips.py --set plays=25
+#
+# See docs/ for what each patch does.
+
+[meta]
+name      = "Badge Arcade Reclawed"
+title_id  = "0004000000153600"
+code_base = 0x100000
+
+[vars]
+plays       = 10           # free plays per crane visit (1-255)
+anchor_date = 2018-07-13   # first day of the week in your boss.sarc Schedule.xml <DateFrom>
+
+# ---------------------------------------------------------------------------
+# Title screen: boot without the network
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x33D3C8
+original    = "mov r0, #0x5"
+asm         = "mov r0, #0x26"
+description = "Title state 0x04: after save-data load go to LoadingData (0x26), not ConnectingNetwork (0x05)"
+
+[[patch]]
+address     = 0x33F880
+original    = "mov r0, #0x2b"
+asm         = "mov r0, #0x33"
+description = "Title state 0x28: after local load go to WritingData (0x33), not the NEX download (0x2B)"
+
+[[patch]]
+address     = 0x34111C
+original    = "beq #0x34116c"
+asm         = "nop"
+description = "Title state 0x34: never enter DataSalvage (it needs the server)"
+
+[[patch]]
+address     = 0x34140C
+original    = "mov r0, #0x37"
+asm         = "mov r0, #0x39"
+description = "Title state 0x36: skip the NEX upload of recovery plays, go to final setup (0x39)"
+
+[[patch]]
+address     = 0x3412EC
+original    = "mov r0, #0x5"
+asm         = "mov r0, #0x39"
+description = "Title state 0x27: local-data validation goes to final setup instead of connecting"
+
+# ---------------------------------------------------------------------------
+# Hall: pretend the NEX login succeeded
+# sb = &gGameData (0x42BE68). The hall logic only runs when the network mode at
+# +0x71A04 is 2, so set it, then jump to the "login OK" branch (state 0x4B).
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2EFB70
+asm         = """
+    ldr r0, [sb]
+    add r0, r0, #0x71000
+    mov r1, #2
+    str r1, [r0, #0xa04]
+    b #0x2efdcc
+"""
+description = "Hall state 0x44: set network mode = 2 and jump to the connection-success branch"
+
+# ---------------------------------------------------------------------------
+# Cranes: free plays (game variable 0x0C = Bonus_FreePlaySum)
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2DFD2C
+original    = "bl #0x25a20c"
+asm         = "mov r0, #${plays}"
+description = "Crane entry: Bonus_FreePlaySum check reads as ${plays}"
+
+[[patch]]
+address     = 0x2DFD48
+original    = "bl #0x25a20c"
+asm         = "mov r0, #${plays}"
+description = "Crane entry: Bonus_FreePlaySum value used for the session = ${plays}"
+
+# ---------------------------------------------------------------------------
+# Server request status -> success (0 = pending, 1 = success, else error)
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x304E88
+original    = "bl #0x253798"
+asm         = "mov r0, #1"
+description = "Practice Catcher start request (type 0x81)"
+
+[[patch]]
+address     = 0x2E1490
+original    = "bl #0x253798"
+asm         = "mov r0, #1"
+description = "Crane end-of-session save (type 0x61 / 0x800)"
+
+[[patch]]
+address     = 0x305640
+original    = "bl #0x253798"
+asm         = "mov r0, #1"
+description = "Practice Catcher result save (type 0x101)"
+
+# ---------------------------------------------------------------------------
+# Clock remap
+# 0x2B0300 reads the RTC as ms since 2000-01-01. Its final store is redirected to
+# a cave in the .text padding that folds the time into the cached week:
+#   t' = ANCHOR + ((t - ANCHOR) mod WEEK)   (keeps weekday and time of day)
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2B034C
+original    = "strd r0, r1, [r4]"
+asm         = "b #0x3d79b0"
+description = "Root clock 0x2B0300: redirect final store to the remap cave"
+
+[[patch]]
+address     = 0x3D79B0
+require_empty = true
+asm         = """
+    ldr r2, anc_lo
+    ldr r3, anc_hi
+    subs r0, r0, r2          @ d = t - ANCHOR (64-bit)
+    sbc r1, r1, r3
+    ldr ip, week
+neg:                         @ while d < 0: d += WEEK
+    cmp r1, #0
+    bge pos
+    adds r0, r0, ip
+    adc r1, r1, #0
+    b neg
+pos:                         @ while d >= WEEK: d -= WEEK
+    cmp r1, #0
+    bne sub_
+    cmp r0, ip
+    blo done
+sub_:
+    subs r0, r0, ip
+    sbc r1, r1, #0
+    b pos
+done:                        @ t' = ANCHOR + d, then the original epilogue
+    adds r0, r0, r2
+    adc r1, r1, r3
+    strd r0, r1, [r4]
+    add sp, sp, #0x14
+    pop {r4, r5, pc}
+anc_lo: .word ${anchor_ms_lo}
+anc_hi: .word ${anchor_ms_hi}
+week:   .word ${week_ms}
+"""
+description = "Clock remap cave (in .text padding), anchor ${anchor_date}"

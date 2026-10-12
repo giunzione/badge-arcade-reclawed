@@ -1,0 +1,64 @@
+name: Build patch
+
+# Builds the IPS from patches/*.toml on every push to main and on pull requests.
+# The status shows up as a check on each commit and as the badge in the README.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check scripts compile
+        run: python -m py_compile tools/*.py
+
+      - name: Build IPS (default vars)
+        run: python tools/build_ips.py
+
+      - name: Build IPS (variable override smoke test)
+        run: python tools/build_ips.py --set plays=99 --out /tmp/smoke/code.ips
+
+      - name: Validate IPS structure
+        run: |
+          python - <<'EOF'
+          import pathlib, sys
+          for p in pathlib.Path("build").rglob("*.ips"):
+              d = p.read_bytes()
+              assert d[:5] == b"PATCH" and d[-3:] == b"EOF", f"{p}: bad header/footer"
+              i, n = 5, 0
+              while d[i:i+3] != b"EOF":
+                  size = int.from_bytes(d[i+3:i+5], "big")
+                  assert size > 0, f"{p}: RLE/empty record not expected"
+                  i += 5 + size
+                  n += 1
+              assert i == len(d) - 3, f"{p}: trailing data"
+              print(f"{p}: OK, {n} records, {len(d)} bytes")
+          EOF
+
+      - name: Package
+        run: |
+          cd build
+          zip -r ../badge-arcade-reclawed.zip luma
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: badge-arcade-reclawed-${{ github.sha }}
+          path: badge-arcade-reclawed.zip
+          if-no-files-found: error

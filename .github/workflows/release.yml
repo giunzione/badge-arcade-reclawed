@@ -1,0 +1,42 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds the IPS and publishes a GitHub Release
+# with the ready-to-extract zip attached. Tags with a hyphen (v0.2.0-beta)
+# are marked as pre-releases.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build IPS
+        run: python tools/build_ips.py
+
+      - name: Package
+        run: |
+          cd build
+          zip -r "../badge-arcade-reclawed-${GITHUB_REF_NAME}.zip" luma
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: badge-arcade-reclawed-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

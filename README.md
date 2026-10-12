@@ -4,6 +4,8 @@
 
 # Badge Arcade Reclawed
 
+[![Build patch](https://github.com/giunzione/badge-arcade-reclawed/actions/workflows/build.yml/badge.svg)](https://github.com/giunzione/badge-arcade-reclawed/actions/workflows/build.yml)
+
 An offline revival patch for **Nintendo Badge Arcade** on the Nintendo 3DS.
 
 Nintendo shut down the game’s servers on 8 April 2024, and the game has been unplayable ever since.
@@ -58,6 +60,19 @@ Badges you win **are not kept** yet. The original game stored your collection on
 4. Launch Nintendo Badge Arcade.
 
 To uninstall, delete `code.ips`. The installed game is never modified.
+
+### Building from source
+
+The patch is defined as data in [`patches/eur-v1.3.1.toml`](patches/eur-v1.3.1.toml): address, ARM instructions and a description for each change. [`tools/build_ips.py`](tools/build_ips.py) turns it into an `.ips`. Requires Python 3.11+.
+
+```bash
+pip install -r requirements.txt
+python3 tools/build_ips.py                              # defaults from the TOML [vars]
+python3 tools/build_ips.py --set plays=25               # override a variable
+python3 tools/build_ips.py --set anchor_date=2018-07-20 # if your boss.sarc covers another week
+```
+
+The output goes to `build/luma/titles/0004000000153600/code.ips`. If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
 
 ---
 
