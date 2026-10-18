@@ -220,7 +220,31 @@ export_hook:
     cmp r0, #0
     movne r1, #0
     blne #0x2412f4
+    bl mark_owner              @ after the tutorial: no longer a new player
     mov r0, #1                 @ request status: success
+    pop {r4, pc}
+
+@ --- network mode 0 means "new player": the hall then replays the tutorial.
+@ Online, the download handlers (0x33FC10, 0x30EB94) set it to 2 once the
+@ own-badge list is not empty. Do the same after a load and after a session.
+mark_owner:
+    push {r4, lr}
+    ldr r4, p_game
+    ldr r4, [r4]
+    cmp r4, #0
+    beq m_out
+    add r4, r4, #0x71000
+    ldr r0, [r4, #0xa54]
+    cmp r0, #0
+    beq m_out
+    bl #0x239e44               @ total count of owned badges
+    cmp r0, #0
+    beq m_out
+    ldrb r0, [r4, #0xa04]
+    cmp r0, #0
+    moveq r0, #2
+    streq r0, [r4, #0xa04]
+m_out:
     pop {r4, pc}
 
 @ --- replaces "bl 0x2CE850" (savedata writer) ------------------------------
@@ -261,6 +285,7 @@ load_hook:
     add r0, r0, #0x400
     add r0, r0, #0x18
     bl load_blob
+    bl mark_owner
     ldr r1, p_flag
     mov r0, #1
     str r0, [r1]               @ saves may now overwrite the file
