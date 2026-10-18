@@ -108,6 +108,12 @@ asm         = "bl #0x3d7a28"
 description = "Crane end-of-session save (type 0x61 / 0x800): success, and export won badges to HOME (cave)"
 
 [[patch]]
+address     = 0x3125A0
+original    = "bl #0x253798"
+asm         = "bl #0x3d7a28"
+description = "Tutorial crane (first play) end-of-session save (type 0x261 / 0x800): same as 0x2E1490"
+
+[[patch]]
 address     = 0x305640
 original    = "bl #0x253798"
 asm         = "mov r0, #1"
