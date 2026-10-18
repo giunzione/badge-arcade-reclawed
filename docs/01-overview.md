@@ -32,7 +32,7 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | # | Address | Change | Purpose |
 |---|---|---|---|
 | 1 | `0x33D3C8` | `mov r0,#0x26` | Title: after save-data load go to *LoadingData* instead of *ConnectingNetwork* |
-| 2 | `0x33F880` | `bl` cave | Title: load saved progress, then go to *WritingData* instead of the NEX download |
+| 2 | `0x33F880` | `mov r0,#0x33` | Title: after local load go to *WritingData* instead of the NEX download |
 | 3 | `0x34111C` | `nop` | Title: never enter *DataSalvage* (it needs the server) |
 | 4 | `0x34140C` | `mov r0,#0x39` | Title: skip the NEX upload of recovery plays |
 | 5 | `0x3412EC` | `mov r0,#0x39` | Title: local-data validation path goes to final setup |
@@ -45,6 +45,7 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule |
 | 12 | `0x2CDDB4` → `0x3D7A20` | call + cave | After each `savedata` write, save the progress blob to `extdata:/reclawed` |
 | 13 | (in the caves of 9, 10b and the boot load) | | Leave *new player* mode (network mode 0) once the player owns a badge |
+| 14 | `0x33F7CC`, `0x2D6398` → cave | branch / call | Load the saved badges once per boot: at title state `0x28`, or at hall entry if the boot skipped `0x28` |
 
 Patch 11's and 12's caves live in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable.
 

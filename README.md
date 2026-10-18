@@ -41,7 +41,7 @@ The original game stored your collection on Nintendo's servers. The patch keeps 
 
 ### Starting from scratch
 
-If you never played Badge Arcade, or your save data is gone, the game starts with the rabbit's tutorial as if it were your first visit. Since v0.2.1 this works offline too: the tutorial crane saves your badge, and once it's done the game treats you as a returning player instead of sending you back to the tutorial.
+If you never played Badge Arcade, or your save data is gone, the game starts with the rabbit's tutorial as if it were your first visit. Since v0.2.2 this works offline too: the tutorial crane saves your badge, and once it's done the game treats you as a returning player instead of sending you back to the tutorial.
 
 This case was found and tested by a French 3DS fan who reached out right after the first release. Thank you!
 
