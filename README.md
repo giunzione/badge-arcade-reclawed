@@ -6,12 +6,12 @@
 
 [![Build patch](https://github.com/giunzione/badge-arcade-reclawed/actions/workflows/build.yml/badge.svg)](https://github.com/giunzione/badge-arcade-reclawed/actions/workflows/build.yml)
 
-An offline revival patch for **Nintendo Badge Arcade** on the Nintendo 3DS.
+The **offline** way to play **Nintendo Badge Arcade** on the Nintendo 3DS.
 
-Nintendo shut down the game’s servers on 8 April 2024, and the game has been unplayable ever since.
+Nintendo shut down the game’s servers on 8 April 2024. If you want the online experience back, with new machines every day, custom badges and a Miiverse-style gallery, have a look at [BadgeCade](https://badgecade.com/), which brings back Badge Arcade's servers.
 
-This project is a small [Luma3DS](https://github.com/LumaTeam/Luma3DS) code patch that removes the server dependency. \
-You can enter the arcade again, play the crane machines and the Practice Catcher, and get a different set of machines every day of the week, all without an internet connection.
+Reclawed takes the opposite approach: no server at all. It's a small [Luma3DS](https://github.com/LumaTeam/Luma3DS) code patch that removes the game's dependency on the network, so it runs from your SD card alone, with no account and nothing that has to stay online. \
+You can enter the arcade again, play the crane machines and the Practice Catcher, get a different set of machines every day of the week and keep the badges you win, all without an internet connection. The patch and the research behind it are open source.
 
 > [!NOTE]
 > This project contains **no Nintendo code or assets**. It ships only an IPS patch (our own instructions) and helper scripts. \
@@ -54,7 +54,7 @@ This case was found and tested by a French 3DS fan who reached out right after t
 - **Badges in the HOME Menu right away.** Today they appear in the badge box after you open the badge book once, or at the next launch. The export is already triggered at the end of each session; it only needs to run without waiting for the badge book.
 - **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
 - **Faster loading**, if possible. Some of the wait at boot may come from steps meant for the online service. To be investigated, no promises.
-- **Other regions** (USA, JPN), with help from people who own those versions.
+- **Other regions** (USA, JPN): lower priority, since BadgeCade already covers them online. Contributions from people who own those versions are still welcome.
 
 ---
 
