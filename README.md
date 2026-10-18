@@ -39,9 +39,22 @@ I wanted to see how far a purely client-side approach could go, with no server a
 
 The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead, and sends the badges you win to the HOME Menu badge box at the end of each crane session.
 
+### Starting from scratch
+
+If you never played Badge Arcade, or your save data is gone, the game starts with the rabbit's tutorial as if it were your first visit. Since v0.2.1 this works offline too: the tutorial crane saves your badge, and once it's done the game treats you as a returning player instead of sending you back to the tutorial.
+
+This case was found and tested by a French 3DS fan who reached out right after the first release. Thank you!
+
 > [!NOTE]
-> So far the patch has been tested on **a single console**. The code changes don't depend on the hardware model, but setups different from mine (another SpotPass week in `boss.sarc`, no previous save data, no NNID) haven't been tried yet. \
+> So far the patch has been tested on **two consoles** (a returning player and a brand-new save). Setups different from these, for example another SpotPass week in `boss.sarc` or no NNID, haven't been tried yet. \
 > If you try it, please [open an issue](https://github.com/giunzione/badge-arcade-reclawed/issues) and say whether it worked, with your console model and Luma3DS version.
+
+### Planned
+
+- **Badges in the HOME Menu right away.** Today they appear in the badge box after you open the badge book once, or at the next launch. The export is already triggered at the end of each session; it only needs to run without waiting for the badge book.
+- **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
+- **Faster loading**, if possible. Some of the wait at boot may come from steps meant for the online service. To be investigated, no promises.
+- **Other regions** (USA, JPN), with help from people who own those versions.
 
 ---
 
@@ -139,6 +152,7 @@ The idea, direction and all testing on real hardware are mine; the reverse engin
 - [DaniElectra](https://github.com/DaniElectra/badge-arcade-server): earlier server research
 - [AntiMach](https://github.com/AntiMach/advanced-badge-editor): Advanced Badge Editor, whose source documents the HOME badge file format
 - The [Pretendo Network](https://pretendo.network) team
+- A French 3DS fan, for finding and testing the first-boot case
 
 ## License
 

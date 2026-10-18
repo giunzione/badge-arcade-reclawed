@@ -41,8 +41,10 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | 8 | `0x304E88` | `mov r0,#1` | Practice Catcher: start request returns *success* |
 | 9 | `0x2E1490` | `bl` cave | Crane: end-of-session save returns *success* and exports won badges to the HOME Menu |
 | 10 | `0x305640` | `mov r0,#1` | Practice Catcher: result save returns *success* |
+| 10b | `0x3125A0` | `bl` cave | Tutorial crane (first play): end-of-session save, same as patch 9 |
 | 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule |
 | 12 | `0x2CDDB4` → `0x3D7A20` | call + cave | After each `savedata` write, save the progress blob to `extdata:/reclawed` |
+| 13 | (in the caves of 9, 10b and the boot load) | | Leave *new player* mode (network mode 0) once the player owns a badge |
 
 Patch 11's and 12's caves live in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable.
 

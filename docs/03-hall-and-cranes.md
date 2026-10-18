@@ -17,6 +17,8 @@ The handler at `0x2D58A8` turns `0x4C`–`0x4E` into the dialogues `Hall_Disable
 
 **Network mode.** The value at `[0x42BE68] + 0x71A04` is set to `2` by state `0x49` through `0x24760C`. The rest of the hall logic (`0x2D56AC`) only runs normally when it equals 2. Otherwise it keeps sending the hall back to `0x44`, which loops forever if you skip only the login. Patch 6 therefore writes `2` there and then jumps to the success branch at `0x2EFDCC`.
 
+**New players.** Before that, on entering the hall (`0x2D6398`), a network mode of `0` means *new player*: the hall switches to sub-state `0x43` and plays the introduction (`Introduction_Day01_*`). Online, the download handlers (`0x33FC10` at boot, `0x30EB94` in game) set the mode to `2` once the downloaded own-badge list is not empty (`0x239E44` returns the total count). Offline nothing downloads, so a fresh save would replay the tutorial forever. The persistence caves apply the same rule after loading the saved badges at boot and at the end of every crane session, including the tutorial crane, whose save request is checked separately at `0x3125A0`.
+
 ## Server request status
 
 Every server operation is polled through one function:
