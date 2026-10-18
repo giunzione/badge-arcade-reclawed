@@ -41,6 +41,12 @@ asm         = "mov r0, #0x33"
 description = "Title state 0x28: after local load go to WritingData (0x33), not the NEX download (0x2B)"
 
 [[patch]]
+address     = 0x2D6398
+original    = "ldr r0, [r8]"
+asm         = "bl #0x3d7a2c"
+description = "Hall entry, before the new-player check: load saved badges if the title didn't (cave)"
+
+[[patch]]
 address     = 0x33F7CC
 original    = "push {r4, r5, r6, lr}"
 asm         = "b #0x3d7a24"
@@ -214,7 +220,8 @@ require_empty = true
 asm         = """
     b save_hook               @ 0x3D7A20, from 0x2CDDB4
     b state28_hook            @ 0x3D7A24, from 0x33F7CC
-    b export_hook             @ 0x3D7A28, from 0x2E1490
+    b export_hook             @ 0x3D7A28, from 0x2E1490 / 0x3125A0
+    b hall_hook               @ 0x3D7A2C, from 0x2D6398
 
 @ --- crane end of session: the real status function 0x253798 exported the
 @ prizes to HOME (0x2412F4(badgeMgr, 0)) once the server answered. We skip the
@@ -283,16 +290,35 @@ h_out:
     mov r0, r4
     pop {r4, pc}
 
-@ --- title state 0x28 handler entry (0x33F7CC). The state can exit to the
-@ SpotPass emergency notice (0x29) instead of 0x33F880, so load here, once. --
+@ --- boot load, run once, from whichever hook comes first:
+@ - title state 0x28 entry (0x33F7CC): the usual path, before the HOME export
+@   of states 0x33/0x35;
+@ - hall entry (0x2D6398), right before the "new player" check: on some saves
+@   LoadingData exits through state 0x27 straight to 0x39 and never reaches 0x28.
 state28_hook:
     push {r0, r1, r2, r3, ip, lr}
+    bl load_once
+    pop {r0, r1, r2, r3, ip, lr}
+    push {r4, r5, r6, lr}      @ replaced instruction
+    b #0x33f7d0
+
+hall_hook:                     @ called with bl from 0x2D6398
+    push {r0, r1, r2, r3, ip, lr}
+    bl load_once
+    pop {r0, r1, r2, r3, ip, lr}
+    ldr r0, [r8]               @ replaced instruction
+    bx lr
+
+load_once:
+    push {r4, lr}
     ldr r0, p_flag
     ldr r0, [r0]
     cmp r0, #0
-    bne st_done                @ already loaded this boot
+    bne lo_out                 @ already loaded this boot
     ldr r0, p_game
     ldr r0, [r0]
+    cmp r0, #0
+    beq lo_out
     add r0, r0, #0x400
     add r0, r0, #0x18
     bl load_blob
@@ -300,10 +326,8 @@ state28_hook:
     ldr r1, p_flag
     mov r0, #1
     str r0, [r1]               @ saves may now overwrite the file
-st_done:
-    pop {r0, r1, r2, r3, ip, lr}
-    push {r4, r5, r6, lr}      @ replaced instruction
-    b #0x33f7d0
+lo_out:
+    pop {r4, pc}
 
 @ --- save_blob / load_blob share one frame layout (same as 0x2CE850) -----
 @ [sp] [sp+4] stack args, [sp+8..0x37] file handle, [sp+0x38] guard,
