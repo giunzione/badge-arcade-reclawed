@@ -168,13 +168,18 @@ static void draw_top(const CheckReport *r, const char *version)
 		text("powered by", lx - 4, ly + 5, 0.4f, COL_DIM, C2D_AlignRight);
 	}
 
-	/* One row per check, under a thin divider; stops above the corner logo. */
+	/* One row per check, under a thin divider; stops above the corner logo.
+	 * Five rows fit at full size; with six or seven (e.g. offline, with a
+	 * patch on the SD) the rows get tighter and the text a bit smaller. */
 	C2D_DrawRectSolid(24, 100, 0.5f, TOP_W - 48, 1, COL_PANEL_HI);
+	float step = r->count <= 5 ? 21 : r->count == 6 ? 17 : 14;
+	float size = r->count <= 5 ? 0.55f : r->count == 6 ? 0.5f : 0.45f;
 	float y = 108;
-	for (int i = 0; i < r->count && y < SCREEN_H - 34; i++, y += 21)
+	for (int i = 0; i < r->count && y < SCREEN_H - 34; i++, y += step)
 	{
-		C2D_DrawCircleSolid(34, y + 8, 0.5f, 5, level_color(r->items[i].level));
-		text(r->items[i].text, 48, y, 0.55f, COL_TEXT, 0);
+		C2D_DrawCircleSolid(34, y + step / 2.6f, 0.5f, r->count <= 5 ? 5 : 4,
+		                    level_color(r->items[i].level));
+		text(r->items[i].text, 48, y, size, COL_TEXT, 0);
 	}
 }
 
@@ -209,6 +214,11 @@ static void draw_status(const CheckReport *r)
 		s = "Everything is installed";
 		color = COL_GREEN;
 	}
+	else if (r->can_install && r->update_available)
+	{
+		s = "Update available";
+		color = COL_GOLD_HI;
+	}
 	else if (r->can_install)
 	{
 		s = "Ready to install";
@@ -229,9 +239,13 @@ static void draw_button(const CheckReport *r, const Menu *m, MenuItem item)
 	bool on = m->enabled[item];
 	bool sel = on && m->selected == item;
 	bool primary = item == ITEM_INSTALL && on;
-	/* No patch for this version: the first button reports it instead. */
-	const char *label = item == ITEM_INSTALL && !r->can_install && r->report_target >= 0
-	                        ? "Report" : ITEM_LABELS[item];
+	/* No patch for this version: the first button reports it instead. An
+	 * older patch of ours on the SD: it updates it. */
+	const char *label = ITEM_LABELS[item];
+	if (item == ITEM_INSTALL && !r->can_install && r->report_target >= 0)
+		label = "Report";
+	else if (item == ITEM_INSTALL && r->can_install && r->update_available)
+		label = "Update";
 
 	if (sel) /* selection ring */
 		round_rect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 9, primary ? COL_TEXT : COL_GOLD);
@@ -335,6 +349,17 @@ static void draw_dialog(const UiState *u)
 		dialog_button(right, "(A) Remove", true);
 		return;
 	}
+	if (u->dialog == DIALOG_CONFIRM_REPLACE)
+	{
+		text_in_box("Replace the patch?", DLG_X, DLG_Y + 8, DLG_W, 30, 0.65f, COL_TEXT);
+		text_wrap("The code.ips on the SD wasn't installed "
+		          "by this app (a custom build, a manual "
+		          "copy or an edited file). It will be lost.",
+		          DLG_X + 16, DLG_Y + 46, 0.5f, COL_DIM, DLG_W - 32);
+		dialog_button(left, "(B) Cancel", false);
+		dialog_button(right, "(A) Replace", true);
+		return;
+	}
 
 	text_in_box(u->title, DLG_X, DLG_Y + 8, DLG_W, 30, 0.65f, u->failed ? COL_RED : COL_GREEN);
 	float y = DLG_Y + 44;
@@ -398,7 +423,8 @@ int ui_dialog_button_at(const UiState *u, int x, int y)
 	if (u->dialog == DIALOG_NONE || y < DLG_BTN_Y || y >= DLG_BTN_Y + DLG_BTN_H)
 		return 0;
 	int left = DLG_X + 12, right = DLG_X + DLG_W - 12 - DLG_BTN_W;
-	bool two_buttons = u->dialog == DIALOG_CONFIRM_UNINSTALL || u->countdown_frames > 0;
+	bool two_buttons = u->dialog == DIALOG_CONFIRM_UNINSTALL ||
+	                   u->dialog == DIALOG_CONFIRM_REPLACE || u->countdown_frames > 0;
 	if (!two_buttons)
 		return x >= left && x < DLG_X + DLG_W - 12 ? 1 : 0;
 	if (x >= left && x < left + DLG_BTN_W)

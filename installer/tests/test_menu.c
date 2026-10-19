@@ -78,6 +78,29 @@ static void selection_leaves_disabled_items(void)
 	CHECK(m.selected == ITEM_EXIT);
 }
 
+static void selection_returns_to_install(void)
+{
+	/* At start the online check disables Install: the selection falls back
+	 * to Restart, and comes back once Install (or Update) is possible, so (A)
+	 * doesn't restart the console by surprise. */
+	Menu m;
+	menu_init(&m);
+	CheckReport checking = report(false, false, -1);
+	menu_update(&m, &checking, true);
+	CHECK(m.selected == ITEM_RESTART);
+	CheckReport ready = report(true, false, -1);
+	menu_update(&m, &ready, true);
+	CHECK(m.selected == ITEM_INSTALL);
+
+	/* But a selection the user made in the meantime is kept. */
+	menu_update(&m, &checking, true);
+	CHECK(m.selected == ITEM_RESTART);
+	menu_move(&m, 1, 0);
+	CHECK(m.selected == ITEM_EXIT);
+	menu_update(&m, &ready, true);
+	CHECK(m.selected == ITEM_EXIT);
+}
+
 static void dpad_moves(void)
 {
 	Menu m;
@@ -140,6 +163,7 @@ void test_menu(void)
 	enabled_items();
 	report_mode();
 	selection_leaves_disabled_items();
+	selection_returns_to_install();
 	dpad_moves();
 	dpad_skips_disabled();
 	touch_layout();

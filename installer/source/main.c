@@ -87,7 +87,7 @@ static void add_line(const char *label, InstResult r, const char *msg)
 	UiLine *l = &ui.lines[ui.line_count++];
 	l->level = r == INST_FAILED ? CHECK_STOP : CHECK_OK;
 	snprintf(l->label, sizeof(l->label), "%s", label);
-	snprintf(l->text, sizeof(l->text), "%s", msg);
+	snprintf(l->text, sizeof(l->text), "%.63s", msg); /* one dialog line; longer text is cut */
 }
 
 static void open_result(const char *title, bool failed)
@@ -117,14 +117,32 @@ static bool restart_console(void)
 
 static void do_install(void)
 {
-	char on_sd[96], msg[96];
+	int t = report.target;
+	char on_sd[96], record[96], msg[96];
 	size_t size;
-	const unsigned char *ips = probe_patch_data(report.target, &size);
+	const unsigned char *ips = probe_patch_data(t, &size);
 	ui.line_count = 0;
-	probe_sd_patch_path(report.target, on_sd, sizeof(on_sd));
+	probe_sd_patch_path(t, on_sd, sizeof(on_sd));
+	probe_sd_record_path(t, record, sizeof(record));
 
-	InstResult patch = inst_write_patch(ips, size, on_sd, msg, sizeof(msg));
-	add_line("Patch", patch, msg);
+	InstResult patch;
+	if (report.keep_sd_patch)
+	{
+		/* The SD has our patch from a newer release: never downgrade it. */
+		patch = INST_ALREADY;
+		add_line("Patch", patch, "newer patch on the SD kept");
+	}
+	else
+	{
+		patch = inst_write_patch(ips, size, on_sd, msg, sizeof(msg));
+		add_line("Patch", patch, msg);
+		/* Remember which release this is, so the next start can offer updates.
+		 * A failure here doesn't undo the install: the patch itself works. */
+		if (patch != INST_FAILED &&
+		    inst_write_record(record, state.game[t].patch_release, state.game[t].code,
+		                      state.game[t].code_version, ips, size, msg, sizeof(msg)) == INST_FAILED)
+			add_line("Patch record", INST_FAILED, msg);
+	}
 	InstResult cfg = INST_FAILED;
 	if (patch != INST_FAILED)
 	{
@@ -156,10 +174,11 @@ static void open_report(void)
 
 static void do_uninstall(void)
 {
-	char on_sd[96], msg[96];
+	char on_sd[96], record[96], msg[96];
 	ui.line_count = 0;
 	probe_sd_patch_path(report.uninstall_target, on_sd, sizeof(on_sd));
-	InstResult r = inst_remove_patch(on_sd, msg, sizeof(msg));
+	probe_sd_record_path(report.uninstall_target, record, sizeof(record));
+	InstResult r = inst_remove_patch(on_sd, record, msg, sizeof(msg));
 	add_line("Patch", r, msg);
 	open_result(r == INST_FAILED ? "Uninstall failed" : "Uninstalled", r == INST_FAILED);
 	refresh();
@@ -184,10 +203,13 @@ static bool activate(MenuItem item)
 	if (item == ITEM_NONE || !menu.enabled[item])
 		return true;
 	menu.selected = item;
+	menu.left_install = false; /* picked by touch: keep it */
 	switch (item)
 	{
 	case ITEM_INSTALL:
-		if (report.can_install)
+		if (report.can_install && report.confirm_replace)
+			ui.dialog = DIALOG_CONFIRM_REPLACE; /* a code.ips the app didn't write */
+		else if (report.can_install)
 			do_install();
 		else if (report.report_target >= 0)
 			open_report();
@@ -213,10 +235,12 @@ static void dialog_input(u32 down, int button)
 			ui.dialog = DIALOG_NONE;
 		return;
 	}
-	if (ui.dialog == DIALOG_CONFIRM_UNINSTALL)
+	if (ui.dialog == DIALOG_CONFIRM_UNINSTALL || ui.dialog == DIALOG_CONFIRM_REPLACE)
 	{
-		if (yes)
+		if (yes && ui.dialog == DIALOG_CONFIRM_UNINSTALL)
 			do_uninstall();
+		else if (yes)
+			do_install();
 		else if (no)
 			ui.dialog = DIALOG_NONE;
 		return;

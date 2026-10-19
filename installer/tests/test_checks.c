@@ -101,15 +101,53 @@ static void already_installed(void)
 	CHECK(r.can_install && !r.nothing_to_do);
 }
 
-static void replaces_other_patch(void)
+/* The code.ips on the SD vs the chosen patch (v0.4.1 online), with the
+ * record the app left next to it (installed.h). */
+static void sd_patch_states(void)
 {
-	/* e.g. the patch of an older release, now that a newer one is online */
 	SystemState s = ready();
-	s.game[EUR].sd_patch = PATCH_DIFFERENT;
 	CheckReport r;
+
+	/* Ours from an older release: an update, offered as such. */
+	s.game[EUR].sd_patch = PATCH_OLDER;
+	snprintf(s.game[EUR].sd_release, sizeof(s.game[EUR].sd_release), "v0.4.0");
 	checks_run(&s, &r);
-	CHECK(r.can_install && !r.nothing_to_do);
-	CHECK(has(&r, CHECK_WARN, "Other patch on SD, will be replaced"));
+	CHECK(r.can_install && !r.nothing_to_do && r.update_available);
+	CHECK(!r.keep_sd_patch && !r.confirm_replace);
+	CHECK(has(&r, CHECK_INFO, "Update available: v0.4.0 -> v0.4.1"));
+
+	/* Ours from a newer release (e.g. offline with an older app): kept, so
+	 * with game patching already on there is nothing to do. */
+	s.game[EUR].sd_patch = PATCH_NEWER;
+	snprintf(s.game[EUR].sd_release, sizeof(s.game[EUR].sd_release), "v0.5.0");
+	s.config_game_patching = 1;
+	checks_run(&s, &r);
+	CHECK(r.can_install && r.nothing_to_do && r.keep_sd_patch && !r.update_available);
+	CHECK(has(&r, CHECK_OK, "Newer patch on SD (v0.5.0), kept"));
+	/* ...and if only the config is left, Install must not touch the patch. */
+	s.config_game_patching = 0;
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.nothing_to_do && r.keep_sd_patch);
+
+	/* Ours, but the order of the releases is unknown (e.g. "dev"). */
+	s.game[EUR].sd_patch = PATCH_OTHER_RELEASE;
+	snprintf(s.game[EUR].sd_release, sizeof(s.game[EUR].sd_release), "dev");
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.update_available && !r.confirm_replace);
+	CHECK(has(&r, CHECK_INFO, "Patch dev on SD, will be replaced"));
+
+	/* Ours, made for another game version (installed before the update). */
+	s.game[EUR].sd_patch = PATCH_OTHER_VERSION;
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.confirm_replace);
+	CHECK(has(&r, CHECK_WARN, "Patch for another game version on SD"));
+
+	/* Not written by the app (custom build, manual copy): ask first. */
+	s.game[EUR].sd_patch = PATCH_FOREIGN;
+	s.game[EUR].sd_release[0] = '\0';
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.nothing_to_do && r.confirm_replace && !r.update_available);
+	CHECK(has(&r, CHECK_WARN, "Unknown patch on SD (asks to replace)"));
 }
 
 static void online_states(void)
@@ -208,6 +246,16 @@ static void no_patch_for_version(void)
 	checks_run(&s, &r);
 	CHECK(r.report_target == EUR);
 	CHECK(has(&r, CHECK_OK, "Badge Arcade EUR, no update (v4096)"));
+
+	/* No update, but a patch exists for the base game (the "-noupdate" TOMLs):
+	 * installable like the updated game, nothing to report. */
+	s.game[EUR].source = SOURCE_BUILTIN;
+	checks_run(&s, &r);
+	CHECK(r.can_install && r.target == EUR && r.report_target == -1);
+	CHECK(count_level(&r, CHECK_STOP) == 0);
+	CHECK(has(&r, CHECK_OK, "Badge Arcade EUR, no update (v4096)"));
+	CHECK(has(&r, CHECK_INFO, "Patch will be installed"));
+	s.game[EUR].source = SOURCE_NONE;
 
 	/* Offline and no built-in patch: still reported, with the offline hint. */
 	s.online = ONLINE_FAILED;
@@ -325,12 +373,12 @@ static void uninstall_target(void)
 
 	/* A leftover patch for a region that has no patch any more. */
 	s = ready();
-	s.game[USA].sd_patch = PATCH_DIFFERENT;
+	s.game[USA].sd_patch = PATCH_FOREIGN;
 	checks_run(&s, &r);
 	CHECK(r.target == EUR && r.uninstall_target == USA);
 
 	/* The detected game's patch comes first. */
-	s.game[EUR].sd_patch = PATCH_DIFFERENT;
+	s.game[EUR].sd_patch = PATCH_OLDER;
 	checks_run(&s, &r);
 	CHECK(r.uninstall_target == EUR);
 }
@@ -351,7 +399,7 @@ void test_checks_run(void)
 {
 	first_install();
 	already_installed();
-	replaces_other_patch();
+	sd_patch_states();
 	online_states();
 	online_patch_problems();
 	no_patch_for_version();

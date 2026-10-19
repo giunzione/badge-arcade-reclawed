@@ -3,7 +3,8 @@
 make_manifest.py - list the built patches for the installer app (patches.txt).
 
 Reads every patches/*.toml, takes the code.ips that build_ips.py wrote for it
-(build/<region>/luma/titles/<title id>/code.ips) and writes to build/patches/:
+(build/<name>/luma/titles/<title id>/code.ips, <name> from tools/patch_meta.py)
+and writes to build/patches/:
 
     patches.txt               the manifest the app reads (format below)
     patch-<REGION>-<c><v>.ips one copy of each patch, named after the game code
@@ -35,6 +36,8 @@ try:
 except ModuleNotFoundError:
     sys.exit('Python 3.11 or newer is required (tomllib).')
 
+from patch_meta import build_name    # build/<name>/ folder per patch
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FORMAT = 1
 CODES = {'update': 'u', 'base': 'b'}
@@ -57,7 +60,7 @@ def entry_for(toml_path, build_dir):
     if not isinstance(version, int) or not 0 <= version <= 0xFFFF:
         sys.exit(f'{where}: [meta] code_version must be a title version (0-65535)')
 
-    ips = os.path.join(build_dir, region, 'luma', 'titles', tid, 'code.ips')
+    ips = os.path.join(build_dir, build_name(meta), 'luma', 'titles', tid, 'code.ips')
     if not os.path.isfile(ips):
         sys.exit(f'{where}: {os.path.relpath(ips, ROOT)} not found, run tools/build_ips.py first')
     data = open(ips, 'rb').read()

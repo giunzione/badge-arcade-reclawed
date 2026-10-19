@@ -120,6 +120,43 @@ static bool check_source(const SystemState *s, int t, CheckReport *r)
 	return false;
 }
 
+/* The code.ips on the SD vs the chosen patch (installed.h). Returns true if
+ * Install has to write the patch. */
+static bool check_sd_patch(const SystemState *s, int t, CheckReport *r)
+{
+	const char *now = s->game[t].patch_release, *sd = s->game[t].sd_release;
+	switch (s->game[t].sd_patch)
+	{
+	case PATCH_SAME:
+		add(r, CHECK_OK, "Patch installed and up to date");
+		return false;
+	case PATCH_NOT_ON_SD:
+		add(r, CHECK_INFO, "Patch will be installed");
+		return true;
+	case PATCH_OLDER:
+		add(r, CHECK_INFO, "Update available: %s -> %s", sd, now);
+		r->update_available = true;
+		return true;
+	case PATCH_NEWER:
+		/* e.g. offline, with an app whose built-in patch is older: never downgrade. */
+		add(r, CHECK_OK, "Newer patch on SD (%s), kept", sd);
+		r->keep_sd_patch = true;
+		return false;
+	case PATCH_OTHER_RELEASE:
+		add(r, CHECK_INFO, "Patch %s on SD, will be replaced", sd);
+		return true;
+	case PATCH_OTHER_VERSION:
+		add(r, CHECK_WARN, "Patch for another game version on SD");
+		return true;
+	case PATCH_FOREIGN:
+		/* Custom build, manual copy or edited: the record doesn't vouch for it. */
+		add(r, CHECK_WARN, "Unknown patch on SD (asks to replace)");
+		r->confirm_replace = true;
+		return true;
+	}
+	return true;
+}
+
 /* Returns true if the config still needs game patching turned on. */
 static bool check_config(const SystemState *s, CheckReport *r)
 {
@@ -165,20 +202,7 @@ void checks_run(const SystemState *s, CheckReport *out)
 		if (have_patch)
 		{
 			out->target = t;
-			switch (s->game[t].sd_patch)
-			{
-			case PATCH_SAME:
-				add(out, CHECK_OK, "Patch installed and up to date");
-				break;
-			case PATCH_DIFFERENT:
-				add(out, CHECK_WARN, "Other patch on SD, will be replaced");
-				patch_needed = true;
-				break;
-			case PATCH_NOT_ON_SD:
-				add(out, CHECK_INFO, "Patch will be installed");
-				patch_needed = true;
-				break;
-			}
+			patch_needed = check_sd_patch(s, t, out);
 		}
 	}
 

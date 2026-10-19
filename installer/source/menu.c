@@ -47,8 +47,18 @@ void menu_update(Menu *m, const CheckReport *r, bool can_restart)
 	m->enabled[ITEM_RESTART] = can_restart;
 	m->enabled[ITEM_EXIT] = true;
 
+	/* Install was only skipped while disabled: go back to it, so (A) does the
+	 * expected thing once the online check is over. */
+	if (m->left_install && m->enabled[ITEM_INSTALL])
+	{
+		m->selected = ITEM_INSTALL;
+		m->left_install = false;
+		return;
+	}
 	if (m->selected >= 0 && m->enabled[m->selected])
 		return;
+	if (m->selected == ITEM_INSTALL)
+		m->left_install = true;
 	for (size_t i = 0; i < sizeof(FALLBACK) / sizeof(FALLBACK[0]); i++)
 		if (m->enabled[FALLBACK[i]])
 		{
@@ -87,6 +97,7 @@ void menu_move(Menu *m, int dx, int dy)
 		if (it != m->selected && m->enabled[it])
 		{
 			m->selected = it;
+			m->left_install = false; /* the user's choice from now on */
 			return;
 		}
 	}

@@ -34,6 +34,12 @@ void probe_sd_patch_path(int index, char *out, size_t len)
 	         (unsigned long long)GAME_TITLES[index].base_tid);
 }
 
+void probe_sd_record_path(int index, char *out, size_t len)
+{
+	snprintf(out, len, SD_TITLES_DIR "/%016llX/" INSTALLED_FILE,
+	         (unsigned long long)GAME_TITLES[index].base_tid);
+}
+
 const unsigned char *probe_patch_data(int index, size_t *size)
 {
 	*size = chosen[index].size;
@@ -169,6 +175,61 @@ static unsigned char *read_builtin(const PatchEntry *e, size_t *size)
 	return data;
 }
 
+/* Pick the patch for game `i`: the latest release's, else the built-in one. */
+static void choose_patch(SystemState *s, OnlineJob *job, int i)
+{
+	const PatchEntry *e;
+	PatchSource src = manifest_choose(job->manifest_ok ? &job->manifest : NULL, job->got[i].ok,
+	                                  builtin_ok ? &builtin : NULL, GAME_TITLES[i].base_tid,
+	                                  s->game[i].code, s->game[i].code_version, &e);
+	if (src == SOURCE_ONLINE)
+	{
+		chosen[i].data = job->got[i].data;
+		chosen[i].size = job->got[i].size;
+		snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
+		         job->manifest.release);
+	}
+	else if (src == SOURCE_BUILTIN)
+	{
+		chosen[i].owned = read_builtin(e, &chosen[i].size);
+		chosen[i].data = chosen[i].owned;
+		if (!chosen[i].data)
+			src = SOURCE_NONE; /* damaged build: behave as if it had no patch */
+		else
+			snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
+			         builtin.release);
+	}
+	s->game[i].source = src;
+}
+
+/* Compare the code.ips on the SD with the chosen patch, using the record the
+ * app left next to it (installed.h). */
+static void classify_sd_patch(SystemState *s, int i, const char *sd_path)
+{
+	unsigned char *sd = NULL, *text = NULL;
+	size_t sd_size = 0, text_size = 0;
+	bool on_sd = fops_exists(sd_path);
+	char sd_hex[SHA256_HEX_LEN + 1] = "";
+	if (on_sd && fops_read(sd_path, &sd, &sd_size, FOPS_MAX_READ) == 0)
+		sha256_hex(sd, sd_size, sd_hex);
+	bool same = sd && chosen[i].data && sd_size == chosen[i].size &&
+	            memcmp(sd, chosen[i].data, sd_size) == 0;
+
+	char rec_path[96];
+	InstalledRecord rec;
+	probe_sd_record_path(i, rec_path, sizeof(rec_path));
+	bool have_rec = on_sd && fops_read(rec_path, &text, &text_size, INSTALLED_MAX_SIZE) == 0 &&
+	                installed_parse((const char *)text, text_size, &rec);
+
+	s->game[i].sd_patch = installed_classify(on_sd, same, have_rec ? &rec : NULL, sd_hex,
+	                                         s->game[i].patch_release, s->game[i].code,
+	                                         s->game[i].code_version);
+	if (have_rec && strcmp(rec.sha256, sd_hex) == 0)
+		snprintf(s->game[i].sd_release, sizeof(s->game[i].sd_release), "%s", rec.release);
+	free(sd);
+	free(text);
+}
+
 void probe_resolve(SystemState *s, OnlineJob *job)
 {
 	probe_free();
@@ -190,34 +251,9 @@ void probe_resolve(SystemState *s, OnlineJob *job)
 		s->game[i].source = SOURCE_NONE;
 		s->game[i].fetch = done && job->manifest_ok ? job->got[i].result : FETCH_NOT_TRIED;
 		s->game[i].patch_release[0] = '\0';
-		s->game[i].sd_patch = fops_exists(sd_path) ? PATCH_DIFFERENT : PATCH_NOT_ON_SD;
-		if (!s->game[i].installed || !done)
-			continue;
-
-		const PatchEntry *e;
-		PatchSource src = manifest_choose(job->manifest_ok ? &job->manifest : NULL, job->got[i].ok,
-		                                  builtin_ok ? &builtin : NULL, GAME_TITLES[i].base_tid,
-		                                  s->game[i].code, s->game[i].code_version, &e);
-		if (src == SOURCE_ONLINE)
-		{
-			chosen[i].data = job->got[i].data;
-			chosen[i].size = job->got[i].size;
-			snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
-			         job->manifest.release);
-		}
-		else if (src == SOURCE_BUILTIN)
-		{
-			chosen[i].owned = read_builtin(e, &chosen[i].size);
-			chosen[i].data = chosen[i].owned;
-			if (!chosen[i].data)
-				src = SOURCE_NONE; /* damaged build: behave as if it had no patch */
-			else
-				snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
-				         builtin.release);
-		}
-		s->game[i].source = src;
-
-		if (chosen[i].data && fops_same_content(sd_path, chosen[i].data, chosen[i].size))
-			s->game[i].sd_patch = PATCH_SAME;
+		s->game[i].sd_release[0] = '\0';
+		if (s->game[i].installed && done)
+			choose_patch(s, job, i);
+		classify_sd_patch(s, i, sd_path);
 	}
 }

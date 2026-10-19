@@ -10,17 +10,11 @@
 
 #include <stdbool.h>
 
+#include "installed.h" /* PatchState: the code.ips on the SD vs the chosen patch */
 #include "luma_config.h"
 #include "manifest.h"
 #include "net.h"
 #include "titles.h"
-
-typedef enum
-{
-	PATCH_NOT_ON_SD, /* no code.ips for this title on the SD */
-	PATCH_SAME,      /* the SD holds exactly the chosen patch */
-	PATCH_DIFFERENT, /* the SD holds some other code.ips (e.g. an older one) */
-} PatchState;
 
 typedef enum
 {
@@ -64,7 +58,8 @@ typedef struct
 		/* The patch picked for that code (manifest_choose()) */
 		PatchSource source;
 		char patch_release[32];
-		PatchState sd_patch;      /* vs the chosen patch; DIFFERENT if none chosen but a file is there */
+		PatchState sd_patch;      /* the code.ips on the SD vs the chosen patch (installed.h) */
+		char sd_release[32];      /* release of the app's own patch on the SD, from its record ("" if unknown) */
 	} game[GAME_TITLE_COUNT];
 } SystemState;
 
@@ -95,6 +90,9 @@ typedef struct
 	bool checking;        /* waiting for the online check */
 	int report_target;    /* installed game with no patch for its version, or -1 */
 	int uninstall_target; /* GAME_TITLES index whose code.ips is on the SD, or -1 */
+	bool update_available; /* the target's patch on the SD is ours, from an older release */
+	bool keep_sd_patch;    /* ours from a newer release: Install must not overwrite it */
+	bool confirm_replace;  /* a code.ips the app didn't write: ask before replacing it */
 } CheckReport;
 
 void checks_run(const SystemState *s, CheckReport *out);

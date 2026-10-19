@@ -53,6 +53,7 @@ int main(int argc, char **argv)
 	run("checks", test_checks_run);
 	run("menu", test_menu);
 	run("manifest", test_manifest);
+	run("installed", test_installed);
 
 	printf("\n%d checks, %d failed\n", test_checks, test_failures);
 	return test_failures ? 1 : 0;

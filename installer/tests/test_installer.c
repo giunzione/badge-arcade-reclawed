@@ -1,10 +1,11 @@
 /*
- * Tests for source/installer.c: the two install actions on a fake SD card
- * inside the temporary folder.
+ * Tests for source/installer.c: the install actions (patch, its record,
+ * config) on a fake SD card inside the temporary folder.
  */
 #include <stdlib.h>
 
 #include "fileops.h"
+#include "installed.h"
 #include "installer.h"
 #include "test.h"
 
@@ -114,18 +115,66 @@ static void remove_patch(void)
 {
 	char msg[96];
 	const char *p = tmp_path(0, "inst/sd3/luma/titles/0004000000153600/code.ips");
+	const char *rec = tmp_path(1, "inst/sd3/luma/titles/0004000000153600/reclawed.txt");
 	CHECK(write_bytes(p, IPS_A, sizeof(IPS_A) - 1) == 0);
-	CHECK(inst_remove_patch(p, msg, sizeof(msg)) == INST_DONE);
+	CHECK(inst_remove_patch(p, NULL, msg, sizeof(msg)) == INST_DONE);
 	CHECK_STR(msg, "patch removed");
 	CHECK(!fops_exists(p));
-	CHECK(inst_remove_patch(p, msg, sizeof(msg)) == INST_ALREADY);
+	CHECK(inst_remove_patch(p, NULL, msg, sizeof(msg)) == INST_ALREADY);
 	CHECK_STR(msg, "no patch installed");
+
+	/* With its record: both go. */
+	CHECK(write_bytes(p, IPS_A, sizeof(IPS_A) - 1) == 0);
+	CHECK(inst_write_record(rec, "v0.4.0", 'u', 5136, IPS_A, sizeof(IPS_A) - 1, msg,
+	                        sizeof(msg)) == INST_DONE);
+	CHECK(inst_remove_patch(p, rec, msg, sizeof(msg)) == INST_DONE);
+	CHECK(!fops_exists(p) && !fops_exists(rec));
+
+	/* A record left without its patch is cleaned up too. */
+	CHECK(write_text(rec, "leftover") == 0);
+	CHECK(inst_remove_patch(p, rec, msg, sizeof(msg)) == INST_DONE);
+	CHECK_STR(msg, "leftover reclawed.txt removed");
+	CHECK(!fops_exists(rec));
+}
+
+static void write_record(void)
+{
+	char msg[96];
+	const char *rec = tmp_path(0, "inst/sd4/luma/titles/0004000000153600/reclawed.txt");
+	CHECK(inst_write_record(rec, "v0.4.0", 'u', 5136, IPS_A, sizeof(IPS_A) - 1, msg,
+	                        sizeof(msg)) == INST_DONE);
+	CHECK_STR(msg, "v0.4.0 recorded");
+
+	/* It reads back as the same record, hash included. */
+	unsigned char *text;
+	size_t size;
+	InstalledRecord r;
+	char hex[SHA256_HEX_LEN + 1];
+	sha256_hex(IPS_A, sizeof(IPS_A) - 1, hex);
+	CHECK(fops_read(rec, &text, &size, INSTALLED_MAX_SIZE) == 0);
+	CHECK(installed_parse((const char *)text, size, &r));
+	CHECK_STR(r.release, "v0.4.0");
+	CHECK(r.code == 'u' && r.version == 5136);
+	CHECK_STR(r.sha256, hex);
+	free(text);
+
+	/* Same again: nothing to write. A new release replaces it. */
+	CHECK(inst_write_record(rec, "v0.4.0", 'u', 5136, IPS_A, sizeof(IPS_A) - 1, msg,
+	                        sizeof(msg)) == INST_ALREADY);
+	CHECK(inst_write_record(rec, "v0.5.0", 'u', 5136, IPS_A, sizeof(IPS_A) - 1, msg,
+	                        sizeof(msg)) == INST_DONE);
+
+	/* No usable release name (e.g. the built-in patches of a broken build). */
+	CHECK(inst_write_record(rec, "", 'u', 5136, IPS_A, sizeof(IPS_A) - 1, msg, sizeof(msg)) ==
+	      INST_FAILED);
+	CHECK_STR(msg, "can't describe the patch");
 }
 
 void test_installer(void)
 {
 	copy_patch();
 	remove_patch();
+	write_record();
 	enable_game_patching();
 	refuses_unknown_configs();
 }

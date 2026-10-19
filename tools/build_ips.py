@@ -7,6 +7,7 @@ packs it. You never need to edit this file to change the patch.
 
 Usage:
     python3 tools/build_ips.py                                  # patches/eur-v1.3.1.toml -> build/EUR/...
+                                                                # (game without update: build/<REGION>-noupdate/...)
     python3 tools/build_ips.py --set plays=25                   # override a [vars] value
     python3 tools/build_ips.py --set anchor_date=2018-07-20
     python3 tools/build_ips.py --check code.bin                 # verify against YOUR decompressed .code
@@ -28,6 +29,8 @@ try:
     from keystone import Ks, KsError, KS_ARCH_ARM, KS_MODE_ARM
 except ImportError:
     sys.exit('keystone-engine is missing: pip install -r requirements.txt')
+
+from patch_meta import build_name    # tools/patch_meta.py: build/<name>/ folder per patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATCH = os.path.join(ROOT, 'patches', 'eur-v1.3.1.toml')
@@ -153,7 +156,7 @@ def main():
         sys.exit(f'\n{errors} mismatch(es): wrong game region or version? Nothing written.')
 
     region = meta.get('region', 'unknown')
-    out = a.out or os.path.join(ROOT, 'build', region, 'luma', 'titles', meta.get('title_id', 'unknown'), 'code.ips')
+    out = a.out or os.path.join(ROOT, 'build', build_name(meta), 'luma', 'titles', meta.get('title_id', 'unknown'), 'code.ips')
     ips = build_ips(records, base)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, 'wb') as f:

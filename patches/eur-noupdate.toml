@@ -1,0 +1,511 @@
+# Badge Arcade Reclawed - patch definition
+#
+# Target: Nintendo Badge Arcade EUR without the update (title v4096)
+#   base title 0004000000153600 (its own .code runs when the update isn't installed)
+#
+# Port of eur-v1.3.1.toml to the base game. Every patch does the same thing;
+# what moved between v4096 and v1.3.1:
+# - code addresses: each site re-found and compared with its surrounding code;
+# - data: globals 0x1000 lower (gGameData 0x42AE68), vtables 0x40D714 / 0x40E038;
+# - the game object: fields past +0x49E38 are 0xC00-0xC04 lower: network mode
+#   +0x70E00 (v1.3.1 +0x71A04), own-badge list +0x70E54 (v1.3.1 +0x71A54);
+#   the upload buffer at +0x418 is unchanged;
+# - the crane end-of-session save also sets a flag at +0x50 before the request
+#   (dropped in v1.3.1); the hooked call is the same;
+# - caves: .text ends at 0x3D6B3C here, so they start at 0x3D6B40.
+#
+# Addresses are virtual addresses in the decompressed .code (text base 0x100000).
+# `original` is optional; when present, `build_ips.py --check` verifies it against
+# your own dumped code before writing anything.
+#
+# `asm` may reference variables from [vars] as ${name}. Values can be overridden on
+# the command line:  python3 tools/build_ips.py --set plays=25
+#
+# See docs/ for what each patch does.
+
+[meta]
+name      = "Badge Arcade Reclawed"
+region    = "EUR"            # used to name build/<region>/ and the release zip
+version   = "no update"
+title_id  = "0004000000153600"
+code_base = 0x100000
+# Exactly which code this patch is for, so the installer app can match it to
+# the game on the console: "update" (the update title runs) or "base" (no
+# update installed), and that title's version as the system reports it.
+code_title   = "base"         # no update installed: the base title runs
+code_version = 4096           # base title version
+
+[vars]
+plays       = 10           # free plays per crane visit (1-255)
+anchor_date = 2018-07-13   # first day of the week in your boss.sarc Schedule.xml <DateFrom>
+
+# ---------------------------------------------------------------------------
+# Title screen: boot without the network
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x33CF08
+original    = "mov r0, #0x5"
+asm         = "mov r0, #0x26"
+description = "Title state 0x04: after save-data load go to LoadingData (0x26), not ConnectingNetwork (0x05)"
+
+[[patch]]
+address     = 0x33F3C0
+original    = "mov r0, #0x2b"
+asm         = "mov r0, #0x33"
+description = "Title state 0x28: after local load go to WritingData (0x33), not the NEX download (0x2B)"
+
+[[patch]]
+address     = 0x2D6040
+original    = "ldr r0, [r8]"
+asm         = "bl #0x3d6bbc"
+description = "Hall entry, before the new-player check: load saved badges if the title didn't (cave)"
+
+[[patch]]
+address     = 0x33F30C
+original    = "push {r4, r5, r6, lr}"
+asm         = "b #0x3d6bb4"
+description = "Title state 0x28 handler entry: load saved badges first (cave), whichever way the state exits"
+
+[[patch]]
+address     = 0x340C5C
+original    = "beq #0x340cac"
+asm         = "nop"
+description = "Title state 0x34: never enter DataSalvage (it needs the server)"
+
+[[patch]]
+address     = 0x340F4C
+original    = "mov r0, #0x37"
+asm         = "mov r0, #0x39"
+description = "Title state 0x36: skip the NEX upload of recovery plays, go to final setup (0x39)"
+
+[[patch]]
+address     = 0x340E2C
+original    = "mov r0, #0x5"
+asm         = "mov r0, #0x39"
+description = "Title state 0x27: local-data validation goes to final setup instead of connecting"
+
+# ---------------------------------------------------------------------------
+# Hall: pretend the NEX login succeeded
+# sb = &gGameData (0x42AE68). The hall logic only runs when the network mode at
+# +0x70E00 is 2, so set it, then jump to the "login OK" branch (state 0x4B).
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2EF494
+asm         = """
+    ldr r0, [sb]
+    add r0, r0, #0x70000
+    mov r1, #2
+    str r1, [r0, #0xe00]
+    b #0x2ef6f0
+"""
+description = "Hall state 0x44: set network mode = 2 and jump to the connection-success branch"
+
+# ---------------------------------------------------------------------------
+# Cranes: free plays (game variable 0x0C = Bonus_FreePlaySum)
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2DF8D0
+original    = "bl #0x2597f4"
+asm         = "mov r0, #${plays}"
+description = "Crane entry: Bonus_FreePlaySum check reads as ${plays}"
+
+[[patch]]
+address     = 0x2DF8EC
+original    = "bl #0x2597f4"
+asm         = "mov r0, #${plays}"
+description = "Crane entry: Bonus_FreePlaySum value used for the session = ${plays}"
+
+# ---------------------------------------------------------------------------
+# Server request status -> success (0 = pending, 1 = success, else error)
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x3047E8
+original    = "bl #0x252da0"
+asm         = "mov r0, #1"
+description = "Practice Catcher start request (type 0x81)"
+
+[[patch]]
+address     = 0x2E1044
+original    = "bl #0x252da0"
+asm         = "bl #0x3d6bb8"
+description = "Crane end-of-session save (type 0x61 / 0x800): success, and export won badges to HOME (cave)"
+
+[[patch]]
+address     = 0x312028
+original    = "bl #0x252da0"
+asm         = "bl #0x3d6bb8"
+description = "Tutorial crane (first play) end-of-session save (type 0x261 / 0x800): same as 0x2E1044"
+
+[[patch]]
+address     = 0x304FA0
+original    = "bl #0x252da0"
+asm         = "mov r0, #1"
+description = "Practice Catcher result save (type 0x101)"
+
+# ---------------------------------------------------------------------------
+# Clock remap
+# 0x2AF858 reads the RTC as ms since 2000-01-01. Its final store is redirected to
+# a cave in the .text padding that folds the time into the cached week:
+#   t' = ANCHOR + ((t - ANCHOR) mod WEEK)   (keeps weekday and time of day)
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2AF8A4
+original    = "strd r0, r1, [r4]"
+asm         = "b #0x3d6b40"
+description = "Root clock 0x2AF858: redirect final store to the remap cave"
+
+[[patch]]
+address     = 0x3D6B40
+require_empty = true
+asm         = """
+    ldr r2, anc_lo
+    ldr r3, anc_hi
+    subs r0, r0, r2          @ d = t - ANCHOR (64-bit)
+    sbc r1, r1, r3
+    ldr ip, week
+neg:                         @ while d < 0: d += WEEK
+    cmp r1, #0
+    bge pos
+    adds r0, r0, ip
+    adc r1, r1, #0
+    b neg
+pos:                         @ while d >= WEEK: d -= WEEK
+    cmp r1, #0
+    bne sub_
+    cmp r0, ip
+    blo done
+sub_:
+    subs r0, r0, ip
+    sbc r1, r1, #0
+    b pos
+done:                        @ t' = ANCHOR + d, then the original epilogue
+    adds r0, r0, r2
+    adc r1, r1, r3
+    strd r0, r1, [r4]
+    add sp, sp, #0x14
+    pop {r4, r5, pc}
+anc_lo: .word ${anchor_ms_lo}
+anc_hi: .word ${anchor_ms_hi}
+week:   .word ${week_ms}
+"""
+description = "Clock remap cave (in .text padding), anchor ${anchor_date}"
+
+# ---------------------------------------------------------------------------
+# Local persistence of won badges
+#
+# Online, the server kept one signed progress blob: counters plus the own-badge
+# list (MessagePack: PrizeNodes / PrizeCounts / OwnedBookPages) and an HMAC.
+# The game builds it with 0x249CF0(game, &buf, &len) and, at boot, parsed the
+# downloaded copy with 0x23952C(game, buf, len).
+#
+# Offline we keep that blob in a file in the game's own extdata:
+#   save: every time the save manager writes "savedata" (call at 0x2CDA88),
+#         build the blob with 0x249CF0 and write [len][blob] to extdata:/reclawed
+#   load: title state 0x28 (where the NEX download used to start) reads the
+#         file and hands it to 0x23952C; states 0x33/0x35 then export to HOME
+#
+# Details that matter (found on hardware):
+# - The game writes savedata at boot before state 0x28. Saving then would
+#   overwrite the file with an empty list, so saves are skipped until the load
+#   has run (flag in the unused tail of the .bss page, 0x4CAFF0, zero at boot).
+# - Extdata files have a fixed size and blocks never written fail to read back,
+#   so the whole file (0x49000 bytes) is written every time.
+# - The blob lives at gGameData+0x418 (the upload buffer). The word before it
+#   is borrowed for the length header and restored right after.
+# - File helpers are the game's own, as used for "savedata" by 0x2CE524:
+#   0x25ACD4(archives, 2) extdata archive, 0x2704B8 open, 0x271DE4 read,
+#   0x2703BC write, 0x271EFC close, 0x25A684 create, 0x25D720/0x25D5CC guard.
+# - A missing or damaged file fails the HMAC check in 0x23952C and is ignored.
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x2CDA88
+original    = "bl #0x2ce524"
+asm         = "bl #0x3d6bb0"
+description = "Save manager: after writing savedata, also save the progress blob"
+
+[[patch]]
+address     = 0x3D6BB0
+require_empty = true
+asm         = """
+    b save_hook               @ 0x3D6BB0, from 0x2CDA88
+    b state28_hook            @ 0x3D6BB4, from 0x33F30C
+    b export_hook             @ 0x3D6BB8, from 0x2E1044 / 0x312028
+    b hall_hook               @ 0x3D6BBC, from 0x2D6040
+
+@ --- crane end of session: the real status function 0x252da0 exported the
+@ prizes to HOME (0x2409A8(badgeMgr, 0)) once the server answered. We skip the
+@ server, so report success and run that export ourselves. -----------------
+export_hook:
+    push {r4, lr}
+    ldr r0, p_badgemgr
+    ldr r0, [r0]
+    cmp r0, #0
+    movne r1, #0
+    blne #0x2409a8
+    bl mark_owner              @ after the tutorial: no longer a new player
+    mov r0, #1                 @ request status: success
+    pop {r4, pc}
+
+@ --- network mode 0 means "new player": the hall then replays the tutorial.
+@ Online, the download handlers (0x33F750, 0x30E61C) set it to 2 once the
+@ own-badge list is not empty. Do the same after a load and after a session.
+mark_owner:
+    push {r4, lr}
+    ldr r4, p_game
+    ldr r4, [r4]
+    cmp r4, #0
+    beq m_out
+    add r4, r4, #0x70000
+    ldr r0, [r4, #0xe54]
+    cmp r0, #0
+    beq m_out
+    bl #0x2394f8               @ total count of owned badges
+    cmp r0, #0
+    beq m_out
+    ldrb r0, [r4, #0xe00]
+    cmp r0, #0
+    moveq r0, #2
+    streq r0, [r4, #0xe00]
+m_out:
+    pop {r4, pc}
+
+@ --- replaces "bl 0x2CE524" (savedata writer) ------------------------------
+save_hook:
+    push {r4, lr}
+    bl #0x2ce524
+    mov r4, r0                 @ keep the writer's result
+    sub sp, sp, #8
+    ldr r0, p_flag
+    ldr r0, [r0]
+    cmp r0, #0
+    beq h_out                  @ boot load not done yet: don't overwrite the file
+    ldr r0, p_game
+    ldr r0, [r0]
+    cmp r0, #0
+    beq h_out
+    mov r1, #0
+    str r1, [sp]
+    str r1, [sp, #4]
+    mov r1, sp
+    add r2, sp, #4
+    bl #0x249cf0               @ [sp] = blob, [sp+4] = len
+    cmp r0, #0
+    beq h_out
+    ldr r0, [sp]
+    ldr r1, [sp, #4]
+    bl save_blob
+h_out:
+    add sp, sp, #8
+    mov r0, r4
+    pop {r4, pc}
+
+@ --- boot load, run once, from whichever hook comes first:
+@ - title state 0x28 entry (0x33F30C): the usual path, before the HOME export
+@   of states 0x33/0x35;
+@ - hall entry (0x2D6040), right before the "new player" check: on some saves
+@   LoadingData exits through state 0x27 straight to 0x39 and never reaches 0x28.
+state28_hook:
+    push {r0, r1, r2, r3, ip, lr}
+    bl load_once
+    pop {r0, r1, r2, r3, ip, lr}
+    push {r4, r5, r6, lr}      @ replaced instruction
+    b #0x33f310
+
+hall_hook:                     @ called with bl from 0x2D6040
+    push {r0, r1, r2, r3, ip, lr}
+    bl load_once
+    pop {r0, r1, r2, r3, ip, lr}
+    ldr r0, [r8]               @ replaced instruction
+    bx lr
+
+load_once:
+    push {r4, lr}
+    ldr r0, p_flag
+    ldr r0, [r0]
+    cmp r0, #0
+    bne lo_out                 @ already loaded this boot
+    ldr r0, p_game
+    ldr r0, [r0]
+    cmp r0, #0
+    beq lo_out
+    add r0, r0, #0x400
+    add r0, r0, #0x18
+    bl load_blob
+    bl mark_owner
+    ldr r1, p_flag
+    mov r0, #1
+    str r0, [r1]               @ saves may now overwrite the file
+lo_out:
+    pop {r4, pc}
+
+@ --- save_blob / load_blob share one frame layout (same as 0x2CE524) -----
+@ [sp] [sp+4] stack args, [sp+8..0x37] file handle, [sp+0x38] guard,
+@ [sp+0x40] path {vtable, name}, [sp+0x50] byte count; r6 archive, r7 file
+
+save_blob:                     @ r0 = blob, r1 = len
+    push {r4, r5, r6, r7, r8, lr}
+    sub sp, sp, #0x58
+    mov r4, r0
+    mov r5, r1
+    ldr r0, max_len
+    cmp r5, r0
+    bhi s_out
+    cmp r5, #0x24
+    blo s_out
+    add r0, sp, #0x38
+    bl #0x25d720               @ guard on (mounts extdata if needed)
+    bl prep
+    mov r0, r6
+    add r1, sp, #8
+    add r2, sp, #0x40
+    mov r3, #1
+    mov ip, #0
+    str ip, [sp]
+    bl #0x2704b8               @ open for write
+    movs r7, r0
+    bne s_write
+    ldr r0, p_names
+    ldr r0, [r0]
+    adr r1, fname
+    ldr r2, file_size
+    mov r3, #0
+    bl #0x25a684               @ create (fixed size)
+    cmp r0, #0
+    beq s_done
+    mov r0, r6
+    add r1, sp, #8
+    add r2, sp, #0x40
+    mov r3, #1
+    mov ip, #0
+    str ip, [sp]
+    bl #0x2704b8
+    movs r7, r0
+    beq s_done
+s_write:
+    ldr r8, [r4, #-4]          @ borrow the word before the blob
+    str r5, [r4, #-4]          @ header = len
+    ldr r0, file_size          @ write the whole file, never leave unwritten blocks
+    str r0, [sp]
+    mov r0, #0
+    str r0, [sp, #4]
+    mov r0, r7
+    add r1, sp, #0x50
+    add r2, sp, #8
+    sub r3, r4, #4
+    bl #0x2703bc
+    str r8, [r4, #-4]          @ give the word back
+    mov r0, r7
+    add r1, sp, #8
+    bl #0x271efc               @ close
+s_done:
+    bl finish
+s_out:
+    add sp, sp, #0x58
+    pop {r4, r5, r6, r7, r8, pc}
+
+load_blob:                     @ r0 = buffer (gGameData+0x418)
+    push {r4, r5, r6, r7, r8, lr}
+    sub sp, sp, #0x58
+    mov r4, r0
+    mov r5, #0                 @ len, 0 = nothing to parse
+    add r0, sp, #0x38
+    bl #0x25d720
+    bl prep
+    mov r0, r6
+    add r1, sp, #8
+    add r2, sp, #0x40
+    mov r3, #0
+    str r3, [sp]
+    bl #0x2704b8               @ open for read
+    movs r7, r0
+    beq l_done
+    ldr r8, [r4, #-4]
+    ldr r0, file_size
+    str r0, [sp]
+    mov r0, #0
+    str r0, [sp, #4]
+    str r0, [sp, #0x50]
+    mov r0, r7
+    add r1, sp, #0x50
+    add r2, sp, #8
+    sub r3, r4, #4
+    bl #0x271de4               @ read the whole file
+    cmp r0, #0
+    beq l_close
+    ldr r0, [sp, #0x50]
+    ldr r1, file_size
+    cmp r0, r1
+    ldreq r5, [r4, #-4]        @ len from header
+l_close:
+    str r8, [r4, #-4]
+    mov r0, r7
+    add r1, sp, #8
+    bl #0x271efc
+l_done:
+    bl finish
+    ldr r0, max_len
+    cmp r5, r0
+    bhi l_out
+    cmp r5, #0x24
+    blo l_out
+    ldr r0, p_game
+    ldr r0, [r0]
+    mov r1, r4
+    mov r2, r5
+    bl #0x23952c               @ parse: HMAC check, counters, own-badge list
+l_out:
+    add sp, sp, #0x58
+    pop {r4, r5, r6, r7, r8, pc}
+
+@ shared: archive + empty file handle + path, in the caller's frame
+prep:
+    push {r0, lr}              @ caller's sp+N is sp+N+8 here
+    ldr r0, p_archives
+    ldr r0, [r0]
+    mov r1, #2
+    bl #0x25acd4
+    mov r6, r0
+    ldr r0, p_handle_vt
+    str r0, [sp, #0x10]
+    mov r0, #0
+    add r1, sp, #0x14
+    mov r2, #11
+p_zero:
+    str r0, [r1], #4
+    subs r2, r2, #1
+    bne p_zero
+    ldr r0, p_path_vt
+    str r0, [sp, #0x48]
+    adr r0, fname
+    str r0, [sp, #0x4c]
+    pop {r0, pc}
+
+@ shared: handle destructor + guard off (as at the end of 0x2CE524)
+finish:
+    push {r0, lr}
+    ldr r0, [sp, #0x18]
+    cmp r0, #0
+    addne r1, sp, #0x10
+    blne #0x271efc
+    add r0, sp, #0x40
+    bl #0x25d5cc
+    pop {r0, pc}
+
+p_game:      .word 0x42ae68
+p_badgemgr:  .word 0x42ae3c
+p_archives:  .word 0x44f790
+p_names:     .word 0x42b140     @ [0] = save manager
+p_handle_vt: .word 0x40d714
+p_path_vt:   .word 0x40e038
+p_flag:      .word 0x4caff0     @ free word after .bss (same page, zero at boot)
+file_size:   .word 0x49000      @ read lands in gGameData+0x414..0x49414 (upload buffer)
+max_len:     .word 0x48ffc
+fname:       .word 0x6c636572, 0x64657761, 0     @ "reclawed"
+"""
+description = "Badge persistence cave: save/load the progress blob to extdata:/reclawed"

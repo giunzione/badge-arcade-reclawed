@@ -40,6 +40,10 @@ const unsigned char *probe_patch_data(int index, size_t *size);
  * title folders with 16 upper-case hex digits. */
 void probe_sd_patch_path(int index, char *out, size_t len);
 
+/* sdmc:/luma/titles/<title id>/reclawed.txt: the record of the patch the
+ * app installed there (installed.h). */
+void probe_sd_record_path(int index, char *out, size_t len);
+
 /* Free the built-in patch copies. */
 void probe_free(void);
 

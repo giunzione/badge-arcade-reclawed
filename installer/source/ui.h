@@ -3,8 +3,8 @@
  *
  * Top screen: logo, version and the list of checks.
  * Bottom screen: status line, the menu (menu.h) and, on top of it, the
- * current dialog: uninstall confirmation or the result of an action, with
- * an optional restart countdown.
+ * current dialog: uninstall / replace confirmation or the result of an
+ * action, with an optional restart countdown.
  *
  * Only drawing lives here; what happens on input is decided in main.c.
  */
@@ -20,6 +20,7 @@ typedef enum
 {
 	DIALOG_NONE,
 	DIALOG_CONFIRM_UNINSTALL,
+	DIALOG_CONFIRM_REPLACE, /* Install over a code.ips the app didn't write */
 	DIALOG_RESULT,
 	DIALOG_REPORT,  /* QR code to a pre-filled GitHub issue (see report.h) */
 } Dialog;

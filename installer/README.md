@@ -17,20 +17,21 @@ dot per check (green = ok, blue = will be done, yellow = warning, red = blocks t
 | Luma3DS | Luma keeps its files on the internal memory (CTRNAND) instead of the SD. If Luma isn't detected at all (e.g. in an emulator) it's only a warning |
 | Nintendo Badge Arcade | it isn't installed |
 | Patch | there is no patch for the exact game version installed (region + update version, or the base game's version without the update). The first button then becomes **Report** |
-| Patch on the SD | never: the same patch shows as installed, a different `code.ips` is replaced |
+| Patch on the SD | never. It's compared with the patch the app would install, using the record the app keeps next to it (see [Updates](#updates)) |
 | `config.ini` | it's missing or not in a format the app fully understands (see below) |
 
 The bottom screen has the controls (D-Pad and <kbd>A</kbd>, or touch):
 
 - **Install** (when nothing blocks it), for the detected game:
-  1. the bundled patch is checked (IPS structure) and copied to
-     `sd:/luma/titles/<title id>/code.ips`;
+  1. the patch is checked (IPS structure) and copied to
+     `sd:/luma/titles/<title id>/code.ips`, with a small record next to it
+     (`reclawed.txt`, see [Updates](#updates));
   2. in `sd:/luma/config.ini`, `enable_game_patching` is set to `1`. The original
      file is first saved to `sd:/3ds/badge-arcade-reclawed/config.ini.bak`.
 
   With **Restart after install** ticked (the default) the console restarts after a
   3-second countdown, which can be cancelled.
-- **Uninstall** deletes the patch from the SD, after a confirmation. Game patching stays
+- **Uninstall** deletes the patch (and its record) from the SD, after a confirmation. Game patching stays
   on, since other mods may rely on it.
 - **Restart** restarts the console, which is when Luma3DS applies the changes.
 - **Exit** (or <kbd>START</kbd>) closes the app.
@@ -62,6 +63,31 @@ The known releases (title IDs for EUR, USA and JPN) are listed in `source/titles
 Which versions have a patch is decided only by `patches/*.toml`: each one names the game
 code it fits (`code_title`, `code_version`), and `tools/make_manifest.py` turns the built
 patches into `patches.txt`.
+
+### Updates
+
+Every install also writes `sd:/luma/titles/<title id>/reclawed.txt` (Luma3DS ignores it):
+
+```
+# Badge Arcade Reclawed: written by the installer app, do not edit.
+reclawed-installed 1 v0.4.0 u5136 <SHA-256 of code.ips>
+```
+
+At the next start the app compares the `code.ips` on the SD with the patch it would
+install now (the latest release's, or its built-in one when offline):
+
+| On the SD | Shown | Install |
+|---|---|---|
+| the same patch, byte for byte | *Patch installed and up to date* | nothing to do |
+| the app's patch from an older release | *Update available: v0.4.0 -> v0.5.0*, button **Update** | replaces it |
+| the app's patch from a newer release (e.g. offline with an older app) | *Newer patch on SD (v0.5.0), kept* | never downgrades it |
+| the app's patch for another game version (e.g. installed before the game's update) | *Patch for another game version on SD* | replaces it |
+| a `code.ips` the app didn't write: no record, or the record's hash doesn't match (custom build, manual copy, edited file) | *Unknown patch on SD (asks to replace)* | asks first |
+
+Opening the app is enough to see whether a newer patch exists. Release tags compare as
+numbers (`v0.10.0` > `v0.9.0`); a pre-release (`v0.5.0-beta`) counts as older than the same
+version without a suffix. Patches copied by hand from a release zip show as up to date when
+they match the current release, and as unknown otherwise.
 
 ### Why the config edit is so careful
 
@@ -141,7 +167,8 @@ for clangd and other editors.
 | `source/sha256.c` | SHA-256, to verify patches |
 | `vendor/qrcodegen/` | QR code generator (Nayuki, MIT), unchanged; see its README |
 | `certs/` | Mozilla's root certificates for HTTPS; see its README |
-| `source/installer.c` | the two install actions (copy patch, enable game patching) |
+| `source/installer.c` | the install actions (copy patch and its record, enable game patching, uninstall) |
+| `source/installed.c` | the record next to the patch (`reclawed.txt`): format, release order, how the SD patch compares |
 | `source/luma_config.c` | reads and edits the text of `config.ini` |
 | `source/luma_system.c` | asks the running Luma3DS for its version and options (3DS only) |
 | `source/fileops.c`, `source/ips.c` | file helpers and the IPS check |

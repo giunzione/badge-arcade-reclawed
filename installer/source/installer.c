@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "fileops.h"
+#include "installed.h"
 #include "ips.h"
 #include "luma_config.h"
 
@@ -52,10 +53,30 @@ InstResult inst_copy_patch(const char *src, const char *dst, char *msg, size_t m
 	return r;
 }
 
-InstResult inst_remove_patch(const char *path, char *msg, size_t msg_len)
+InstResult inst_write_record(const char *path, const char *release, char code, unsigned version,
+                             const void *ips, size_t size, char *msg, size_t msg_len)
 {
+	char text[INSTALLED_MAX_SIZE];
+	int n = installed_format(text, sizeof(text), release, code, version, ips, size);
+	if (n < 0)
+		return report(INST_FAILED, msg, msg_len, "can't describe the patch");
+	if (fops_same_content(path, text, (size_t)n))
+		return report(INST_ALREADY, msg, msg_len, "record already up to date");
+	if (fops_mkdirs_for(path) != 0 || fops_write_replace(path, text, (size_t)n) != 0)
+		return report(INST_FAILED, msg, msg_len, "can't write " INSTALLED_FILE);
+	return report(INST_DONE, msg, msg_len, "%s recorded", release);
+}
+
+InstResult inst_remove_patch(const char *path, const char *record_path, char *msg, size_t msg_len)
+{
+	/* The record goes first: a record without its patch would be harmless,
+	 * but never let one describe a code.ips that is still there. */
+	bool had_record = record_path && fops_exists(record_path);
+	if (had_record && (remove(record_path) != 0 || fops_exists(record_path)))
+		return report(INST_FAILED, msg, msg_len, "can't delete " INSTALLED_FILE);
 	if (!fops_exists(path))
-		return report(INST_ALREADY, msg, msg_len, "no patch installed");
+		return had_record ? report(INST_DONE, msg, msg_len, "leftover " INSTALLED_FILE " removed")
+		                  : report(INST_ALREADY, msg, msg_len, "no patch installed");
 	if (remove(path) != 0 || fops_exists(path))
 		return report(INST_FAILED, msg, msg_len, "can't delete the patch");
 	return report(INST_DONE, msg, msg_len, "patch removed");

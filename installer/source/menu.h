@@ -34,6 +34,8 @@ typedef struct
 	bool enabled[ITEM_COUNT];
 	MenuItem selected;
 	bool restart_after_install; /* state of the toggle */
+	bool left_install;          /* selection moved off Install only because it was
+	                             * disabled (e.g. during the online check) */
 } Menu;
 
 typedef struct
@@ -47,7 +49,9 @@ void menu_init(Menu *m);
 /* Enable items from the checks: Install when there is something to install
  * (or, labelled "Report", when the game's version has no patch), Uninstall
  * when a patch is on the SD, Restart when the console can restart.
- * Moves the selection off a disabled item. */
+ * Moves the selection off a disabled item, and back to Install when it was
+ * only moved off it because Install was disabled for a while (the user
+ * hasn't picked something else since). */
 void menu_update(Menu *m, const CheckReport *r, bool can_restart);
 
 /* D-pad: move one cell left/right (dx) or up/down (dy), skipping disabled

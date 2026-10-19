@@ -24,10 +24,16 @@ InstResult inst_write_patch(const void *ips, size_t size, const char *dst, char 
 /* Same, reading the IPS from the file `src`. */
 InstResult inst_copy_patch(const char *src, const char *dst, char *msg, size_t msg_len);
 
-/* Delete the installed patch at `path` (uninstall). Game patching is left on:
+/* Write the record (installed.h) for the patch `ips` to `path`, next to the
+ * code.ips: which release and game code it came from, and its SHA-256. */
+InstResult inst_write_record(const char *path, const char *release, char code, unsigned version,
+                             const void *ips, size_t size, char *msg, size_t msg_len);
+
+/* Delete the installed patch at `path` (uninstall), and its record at
+ * `record_path` if there is one (NULL: none). Game patching is left on:
  * other mods may rely on it, and without a code.ips it changes nothing for
  * Badge Arcade. */
-InstResult inst_remove_patch(const char *path, char *msg, size_t msg_len);
+InstResult inst_remove_patch(const char *path, const char *record_path, char *msg, size_t msg_len);
 
 /* Set enable_game_patching = 1 in the Luma3DS config.ini at `cfg_path`.
  * Before the edit the current file is copied to `backup_path`. Only the one
