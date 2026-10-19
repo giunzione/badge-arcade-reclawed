@@ -46,7 +46,7 @@ LumaCfgStatus lumacfg_parse(const char *text, size_t len, LumaCfgInfo *info);
  * changes. On error the text is left untouched. */
 LumaCfgStatus lumacfg_set_game_patching(char *text, size_t len, int enabled);
 
-/* Short English description of a status, for the UI. */
+/* Short English description of a status, for the UI (at most 29 chars). */
 const char *lumacfg_status_str(LumaCfgStatus status);
 
 #endif

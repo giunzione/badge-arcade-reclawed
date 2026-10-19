@@ -6,8 +6,8 @@
 #   make -C installer test                   # same, from the app Makefile
 #
 # HOSTCC, not CC: devkitPro's rules export CC as the ARM cross compiler.
-# Only sources that use plain C + stdio are tested here; luma_system.c and
-# main.c need libctru and run on the console only.
+# Only sources that use plain C + stdio are tested here; luma_system.c,
+# main.c and probe.c need libctru and run on the console only.
 #---------------------------------------------------------------------------------
 HOSTCC	?=	cc
 CFLAGS	:=	-std=c99 -g -O1 -Wall -Wextra -Werror -I../source
@@ -20,8 +20,10 @@ EXE	:=	$(EXE).exe
 CFLAGS	+=	-D_CRT_SECURE_NO_WARNINGS
 endif
 
-SOURCES	:=	../source/luma_config.c ../source/fileops.c ../source/ips.c ../source/installer.c
-TESTS	:=	run_tests.c test_luma_config.c test_ips.c test_fileops.c test_installer.c
+SOURCES	:=	../source/luma_config.c ../source/fileops.c ../source/ips.c ../source/installer.c \
+		../source/titles.c ../source/checks.c
+TESTS	:=	run_tests.c test_luma_config.c test_ips.c test_fileops.c test_installer.c \
+		test_checks.c
 
 .PHONY: test clean
 

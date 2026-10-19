@@ -192,11 +192,11 @@ const char *lumacfg_status_str(LumaCfgStatus status)
 	switch (status)
 	{
 	case LUMACFG_OK: return "OK";
-	case LUMACFG_ERR_NO_VERSION: return "config version not found";
+	case LUMACFG_ERR_NO_VERSION: return "no config version";
 	case LUMACFG_ERR_UNSUPPORTED_VERSION: return "unsupported config version";
-	case LUMACFG_ERR_NO_KEY: return "enable_game_patching not found";
-	case LUMACFG_ERR_DUPLICATE_KEY: return "enable_game_patching appears twice";
-	case LUMACFG_ERR_BAD_VALUE: return "enable_game_patching is not 0 or 1";
+	case LUMACFG_ERR_NO_KEY: return "enable_game_patching missing";
+	case LUMACFG_ERR_DUPLICATE_KEY: return "enable_game_patching repeated";
+	case LUMACFG_ERR_BAD_VALUE: return "enable_game_patching not 0/1";
 	}
 	return "unknown error";
 }

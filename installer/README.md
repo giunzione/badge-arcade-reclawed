@@ -5,22 +5,33 @@ it copies `code.ips` to the SD card and turns on Luma3DS *Enable game patching*,
 so users don't need a PC. It is meant to be installed with FBI by scanning a QR code.
 
 > [!NOTE]
-> Work in progress. The app installs the patch and enables game patching, but it
-> doesn't check the installed game yet (region, version), and the interface is plain text.
+> Work in progress: everything works, but the interface is still plain text.
 
 ## What it does
 
-The top screen shows the Luma3DS version, whether game patching is active, what
-`config.ini` says, and whether each bundled patch is already on the SD card.
-Press <kbd>A</kbd> to install:
+At start the app checks the console and lists the result on the top screen:
 
-1. Every bundled patch is checked (IPS structure) and copied to
-   `sd:/luma/titles/<title id>/code.ips`. A different version already there is replaced.
+| Check | Blocks the install when |
+|---|---|
+| Luma3DS | Luma keeps its files on the internal memory (CTRNAND) instead of the SD. If Luma isn't detected at all (e.g. in an emulator) it's only a warning |
+| Nintendo Badge Arcade | it isn't installed, or only a region with no bundled patch is (today only EUR has one) |
+| Update | the v1.3.1 update is missing or a different version is installed |
+| Patch on the SD | never: the same patch shows as installed, a different `code.ips` is replaced |
+| `config.ini` | it's missing or not in a format the app fully understands (see below) |
+
+If nothing blocks it, press <kbd>A</kbd> to install for the detected game:
+
+1. The bundled patch is checked (IPS structure) and copied to
+   `sd:/luma/titles/<title id>/code.ips`.
 2. In `sd:/luma/config.ini`, `enable_game_patching` is set to `1`. The original
    file is first saved to `sd:/3ds/badge-arcade-reclawed/config.ini.bak`.
 
 Then restart the console. Don't save Rosalina's settings before restarting: Rosalina
 writes back the options Luma booted with, which would turn game patching off again.
+
+The known releases (title IDs and the v1.3.1 update version for EUR, USA and JPN) are
+listed in `source/titles.c`. A region becomes supported as soon as a patch for it is
+added under `patches/`: the app bundles every built patch.
 
 ### Why the config edit is so careful
 
@@ -48,6 +59,9 @@ make test   # unit tests on the PC (HOSTCC=clang to pick another compiler)
 make clean
 ```
 
+To try the install flow in an emulator without the game, `make clean && make FAKE_GAME=1`
+builds a version (marked `-fake`) that pretends Badge Arcade EUR v1.3.1 is installed.
+
 `make compile_commands` does a clean build that also writes `build/compile_commands.json`
 for clangd and other editors.
 
@@ -56,11 +70,14 @@ for clangd and other editors.
 | Path | Contents |
 |---|---|
 | `source/main.c` | text UI and the install flow |
+| `source/checks.c` | the checks: what blocks the install and what is shown |
+| `source/probe.c` | gathers the console state the checks need (3DS only) |
+| `source/titles.c` | known Badge Arcade releases (title IDs, v1.3.1 update version) |
 | `source/installer.c` | the two install actions (copy patch, enable game patching) |
 | `source/luma_config.c` | reads and edits the text of `config.ini` |
 | `source/luma_system.c` | asks the running Luma3DS for its version and options (3DS only) |
 | `source/fileops.c`, `source/ips.c` | file helpers and the IPS check |
-| `tests/` | PC unit tests for everything except `main.c` and `luma_system.c` |
+| `tests/` | PC unit tests for everything except `main.c`, `probe.c` and `luma_system.c` |
 | `meta/app.rsf` | makerom settings for the CIA (permissions, services) |
 | `meta/icon.png`, `meta/banner.png`, `meta/banner.wav` | HOME Menu icon (48×48), banner (256×128) and banner sound, made from `docs/logo.png` |
 | `build/` | build output, never committed. `build/romfs/` gets the patches at build time |

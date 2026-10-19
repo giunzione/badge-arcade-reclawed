@@ -67,9 +67,17 @@ APP_UNIQUE_ID	:=	0xBADA0
 # always leaves minor at 0, so FBI shows 0.1.0 as "0.0.0". The on-screen
 # version is the reliable one.
 VERSION_MAJOR	:=	0
-VERSION_MINOR	:=	2
+VERSION_MINOR	:=	3
 VERSION_MICRO	:=	0
 VERSION		:=	$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_MICRO)
+
+# Reclawed: `make clean && make FAKE_GAME=1` pretends Badge Arcade EUR v1.3.1 is
+# installed (see source/probe.c), to try the install flow in an emulator.
+# The version gets a "-fake" suffix so such a build is never mistaken for a real one.
+ifneq ($(FAKE_GAME),)
+VERSION		:=	$(VERSION)-fake
+FAKE_DEFINE	:=	-DRECLAWED_FAKE_GAME
+endif
 
 META		:=	meta
 ICON		:=	meta/icon.png
@@ -89,7 +97,7 @@ CFLAGS	:=	-g -Wall -Wextra -O2 -mword-relocations \
 			-ffunction-sections \
 			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -D__3DS__ -DAPP_VERSION=\"$(VERSION)\"
+CFLAGS	+=	$(INCLUDE) -D__3DS__ -DAPP_VERSION=\"$(VERSION)\" $(FAKE_DEFINE)
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 

@@ -50,6 +50,7 @@ int main(int argc, char **argv)
 	run("ips", test_ips);
 	run("fileops", test_fileops);
 	run("installer", test_installer);
+	run("checks", test_checks_run);
 
 	printf("\n%d checks, %d failed\n", test_checks, test_failures);
 	return test_failures ? 1 : 0;
