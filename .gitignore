@@ -56,6 +56,11 @@ venv/
 *.zip
 out*/
 
+# Installer app build outputs (the .cia is already ignored above)
+*.3dsx
+*.elf
+*.smdh
+
 # OS / editor junk
 .DS_Store
 Thumbs.db
