@@ -6,21 +6,30 @@
 
 [![Build patch](https://github.com/giunzione/badge-arcade-reclawed/actions/workflows/build.yml/badge.svg)](https://github.com/giunzione/badge-arcade-reclawed/actions/workflows/build.yml)
 
-The **offline** way to play **Nintendo Badge Arcade** on the Nintendo 3DS.
+<img src="docs/install-qr.png" alt="QR code: latest reclawed-installer.cia" width="200" align="right">
 
-Nintendo shut down the game’s servers on 8 April 2024. If you want the online experience back, with new machines every day, custom badges and a Miiverse-style gallery, have a look at [BadgeCade](https://badgecade.com/), which brings back Badge Arcade's servers.
+**Play Nintendo Badge Arcade again, offline, straight from your 3DS. No PC needed.**
 
-Reclawed takes the opposite approach: no server at all. It's a small [Luma3DS](https://github.com/LumaTeam/Luma3DS) code patch that removes the game's dependency on the network, so it runs from your SD card alone, with no account and nothing that has to stay online. \
-You can enter the arcade again, play the crane machines and the Practice Catcher, get a different set of machines every day of the week and keep the badges you win, all without an internet connection. The patch and the research behind it are open source.
+Scan the QR code with **FBI** (Remote Install → Scan QR Code), open **Reclawed Installer** and press **Install**. The app checks your console, picks the right patch for your copy of the game, turns on Luma3DS game patching and restarts. That's it.
+
+Nintendo shut down the game's servers on 8 April 2024. Reclawed is a small [Luma3DS](https://github.com/LumaTeam/Luma3DS) code patch that removes the game's dependency on the network: you can enter the arcade, play the crane machines and the Practice Catcher, get a different set of machines every day of the week and keep the badges you win, with no account and nothing that has to stay online.
+
+<br clear="right">
 
 > [!NOTE]
-> This project contains **no Nintendo code or assets**. It ships only an IPS patch (our own instructions) and helper scripts. \
-> You need your own copy of the game and your own SpotPass data, dumped from your own console.
+> This project contains **no Nintendo code or assets**. It ships only an IPS patch (our own instructions), an installer app and helper scripts. > You need your own copy of the game and your own SpotPass data, already on your console.
 
-## Why?
+## Why Reclawed?
 
-Every now and then someone online asks whether Badge Arcade can be played again, and the answer was always “not yet”. \
-I wanted to see how far a purely client-side approach could go, with no server and no network setup, just a patch you drop on your SD card.
+Other projects bring Badge Arcade back too. If you want the online experience, with new machines every day, custom badges and a Miiverse-style gallery, have a look at [BadgeCade](https://badgecade.com/), which brings back Badge Arcade's servers.
+
+Reclawed is built around a different idea: **the simplest possible way to get the game running again, on the console alone.**
+
+- **No PC.** Install from the 3DS itself: scan a QR code in FBI, press one button. No SD card juggling, no files to extract, no boot menus to dig through.
+- **No server.** The patch works without an internet connection, an account or a server that has to stay online.
+- **Safe by default.** Before touching anything the app checks Luma3DS, the game, its region and exact version, and Luma's settings. It backs up your Luma config, changes only the one setting it needs, and can uninstall the patch again.
+- **Always up to date.** The app fetches the newest patch for your game version from the latest release, with a built-in copy for offline use. When a new patch drops, open the app and press **Update**.
+- **Open source.** The patch, the installer and the research behind them are all in this repository.
 
 ---
 
@@ -38,6 +47,19 @@ I wanted to see how far a purely client-side approach could go, with no server a
 | Theme shop, Miiverse gallery, info corner | ❔ Untested |
 | Installer app: install from the console with a QR code, no PC needed | 🆕 New, see [Installation](#installation) |
 
+### Supported game versions
+
+| Region | Game version | Patch | Tested on |
+|---|---|---|---|
+| EUR | v1.3.1 (with the update) | [`eur-v1.3.1.toml`](patches/eur-v1.3.1.toml) | ✅ Real hardware |
+| EUR | Base game, no update | [`eur-noupdate.toml`](patches/eur-noupdate.toml) | 🧪 Test harnesses and emulator only |
+| USA | v1.3.1 (with the update) | [`usa-v1.3.1.toml`](patches/usa-v1.3.1.toml) | 🧪 Test harnesses and emulator only |
+| USA | Base game, no update | [`usa-noupdate.toml`](patches/usa-noupdate.toml) | 🧪 Test harnesses and emulator only |
+| JPN | any | — | ❌ Not supported yet |
+
+"Test harnesses" means every original instruction the patch replaces was checked against that version's code, and the patched code was run in a CPU emulator side by side with the EUR v1.3.1 patch, giving the same results. The installer app itself has so far been tested in the [Azahar](https://azahar-emu.org/) emulator. \
+If you try any 🧪 version on a real console, please [open an issue](https://github.com/giunzione/badge-arcade-reclawed/issues) and say whether it worked, with your console model and Luma3DS version.
+
 The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead, and sends the badges you win to the HOME Menu badge box at the end of each crane session.
 
 ### Starting from scratch
@@ -47,7 +69,7 @@ If you never played Badge Arcade, or your save data is gone, the game starts wit
 This case was found and tested by a French 3DS fan who reached out right after the first release. Thank you!
 
 > [!NOTE]
-> So far the patch has been tested on **two consoles** (a returning player and a brand-new save). Setups different from these, for example another SpotPass week in `boss.sarc` or no NNID, haven't been tried yet. \
+> So far the EUR v1.3.1 patch has been tested on **two consoles** (a returning player and a brand-new save). Setups different from these, for example another SpotPass week in `boss.sarc` or no NNID, haven't been tried yet. \
 > If you try it, please [open an issue](https://github.com/giunzione/badge-arcade-reclawed/issues) and say whether it worked, with your console model and Luma3DS version.
 
 ### Planned
@@ -56,15 +78,16 @@ This case was found and tested by a French 3DS fan who reached out right after t
 - **Badges in the HOME Menu right away.** Today they appear in the badge box after you open the badge book once, or at the next launch. The export is already triggered at the end of each session; it only needs to run without waiting for the badge book.
 - **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
 - **Faster loading**, if possible. Some of the wait at boot may come from steps meant for the online service. To be investigated, no promises.
-- **Other regions** (USA, JPN): lower priority, since BadgeCade already covers them online. Contributions from people who own those versions are still welcome.
+- **Testing the USA and base-game patches on real hardware.** See [Supported game versions](#supported-game-versions).
+- **JPN**: needs the game's code from someone who owns that version. Contributions are welcome.
 
 ---
 
 ## Requirements
 
 - A Nintendo 3DS / 2DS family console running **Luma3DS** custom firmware
-- **Nintendo Badge Arcade, EUR, version 1.3.1**. Base title ID `0004000000153600`, plus its update.
-  Other regions are **not supported**, because the patch addresses differ.
+- **Nintendo Badge Arcade, EUR or USA**, either v1.3.1 (the final update) or the base game without the update.
+  See [Supported game versions](#supported-game-versions). JPN is **not supported** yet, because the patch addresses differ.
 - Your console must still have the game's SpotPass data in its extdata (`boss.sarc`).
   This is the case if the game was opened at least once while the servers were up.
 - The console must be on its **Nintendo Network ID** account. If you use [Pretendo](https://pretendo.network) through Nimbus, switch back to **Nintendo** before launching the game.
@@ -77,22 +100,18 @@ This case was found and tested by a French 3DS fan who reached out right after t
 
 ### With the installer app (no PC needed)
 
-<p align="center">
-  <img src="docs/install-qr.png" alt="QR code: latest reclawed-installer.cia" width="240">
-</p>
-
-1. Connect the console to the internet, open **FBI**, choose **Remote Install → Scan QR Code** and scan the code above. Confirm the install.
+1. Connect the console to the internet, open **FBI**, choose **Remote Install → Scan QR Code** and scan the [QR code at the top of this page](#badge-arcade-reclawed). Confirm the install.
 2. Open **Reclawed Installer** from the HOME Menu. It checks your console and lists what it finds: Luma3DS, the game and its exact version, and Luma's settings. It also looks online for the newest patch for that version; without internet it uses the one built into the app. Anything that blocks the install is shown in red.
 3. Choose **Install**. The app copies the patch to `luma/titles/<title id>/code.ips` and turns on Luma's **"Enable game patching"** (after saving a backup of `luma/config.ini`), then restarts the console.
 4. Launch Nintendo Badge Arcade.
 
-The QR code always points to the newest release. Without a camera, download `reclawed-installer.cia` from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) and install it from the SD card with FBI. The app's **Uninstall** button removes the patch again. When a new patch comes out, just open the app again and choose **Install**: there's no need to reinstall the app.
+The QR code always points to the newest release. Without a camera, download `reclawed-installer.cia` from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) and install it from the SD card with FBI. The app's **Uninstall** button removes the patch again. When a new patch comes out, just open the app again: it shows **Update** in place of **Install**, and there's no need to reinstall the app.
 
 If there's no patch for your version of the game yet, the app shows a **Report** button with a QR code that opens a GitHub issue already filled in with your game's details. Details are in [`installer/README.md`](installer/README.md).
 
-### By hand
+### By hand (with a PC)
 
-1. Download the zip for your region from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) (e.g. `badge-arcade-reclawed-EUR-….zip`) and extract it to the root of your SD card, so that you get `luma/titles/<title id>/code.ips`.
+1. Download the zip for your region and game version from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) (e.g. `badge-arcade-reclawed-EUR-….zip` for v1.3.1, `badge-arcade-reclawed-EUR-noupdate-….zip` for the base game) and extract it to the root of your SD card, so that you get `luma/titles/<title id>/code.ips`.
 2. Open the Luma3DS configuration menu (hold <kbd>SELECT</kbd> while powering on) and enable **"Enable game patching"**.
 3. Launch Nintendo Badge Arcade.
 
@@ -103,7 +122,7 @@ To uninstall, delete `code.ips`. The installed game is never modified.
 
 ### Building from source
 
-The patch is defined as data in [`patches/eur-v1.3.1.toml`](patches/eur-v1.3.1.toml): address, ARM instructions and a description for each change. [`tools/build_ips.py`](tools/build_ips.py) turns it into an `.ips`. Requires Python 3.11+.
+Each patch is defined as data in [`patches/`](patches/), one TOML per game version (e.g. [`patches/eur-v1.3.1.toml`](patches/eur-v1.3.1.toml)): address, ARM instructions and a description for each change. [`tools/build_ips.py`](tools/build_ips.py) turns it into an `.ips`. Requires Python 3.11+.
 
 ```bash
 pip install -r requirements.txt
@@ -144,8 +163,8 @@ The game can't find a Nintendo Network ID. You are probably on a Pretendo accoun
 **The hall is empty or has no machines.**
 Your extdata doesn't contain `boss.sarc`. The patch can't provide machine data, because that data belongs to Nintendo.
 
-**Can you add other regions?**
-Possibly. It needs the `.code` of that region's v1.3.1 update to locate the same functions. Contributions are welcome: add a `patches/<region>-v1.3.1.toml` with its own `[meta] region`, `title_id`, `code_title` and `code_version`, and CI will build it, ship it as a separate zip and offer it to the installer app.
+**Can you add other regions or versions?**
+Possibly. It needs the `.code` of that game version to locate the same functions. Contributions are welcome: add a `patches/<region>-<version>.toml` with its own `[meta] region`, `title_id`, `code_title` and `code_version`, and CI will build it, ship it as a separate zip and offer it to the installer app.
 
 **I won a badge but it's not in the HOME Menu badge box.**
 Open the badge book in the game once, then check the badge box again. If you close the game first, the badges are added the next time you launch it.
