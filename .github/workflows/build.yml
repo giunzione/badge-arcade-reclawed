@@ -32,6 +32,9 @@ jobs:
       - name: Build all regions
         run: .github/scripts/build_all.sh
 
+      - name: Installer unit tests
+        run: make -C installer/tests
+
       - name: Variable override smoke test
         run: |
           for f in patches/*.toml; do
@@ -61,4 +64,34 @@ jobs:
         with:
           name: badge-arcade-reclawed-${{ github.sha }}
           path: dist/*.zip
+          if-no-files-found: error
+
+      # The built patches, for the installer job below.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patches-${{ github.sha }}
+          path: build/
+          if-no-files-found: error
+
+  installer:
+    # Builds the installer app (.3dsx) with the patches from the build job,
+    # in devkitPro's own image (devkitARM + libctru).
+    needs: build
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: patches-${{ github.sha }}
+          path: build/
+
+      - name: Build the installer
+        run: make -C installer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reclawed-installer-${{ github.sha }}
+          path: installer/reclawed-installer.3dsx
           if-no-files-found: error

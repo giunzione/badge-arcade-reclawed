@@ -3,8 +3,12 @@
 #
 #   make        -> reclawed-installer.3dsx  (run from the Homebrew Launcher)
 #   make cia    -> reclawed-installer.cia   (install with FBI)
+#   make test   -> PC unit tests (tests/)
+#   make compile_commands  -> clean build + build/compile_commands.json
 #   make clean
 #
+# The patches must be built first (tools/build_ips.py); they are bundled from
+# PATCH_BUILD (default ../build).
 # Needs devkitARM + libctru, and makerom + bannertool on the PATH for `make cia`.
 # Based on the devkitPro 3ds template; the project-specific parts are marked
 # with "Reclawed:".
@@ -54,7 +58,7 @@ APP_TITLE	:=	Reclawed Installer
 APP_DESCRIPTION	:=	Badge Arcade Reclawed patch installer
 APP_AUTHOR	:=	Badge Arcade Reclawed
 # Product code and unique ID must not clash with other installed titles.
-# 0xBADA0 is in the homebrew range (0x00300-0xF7FFF): title ID 00040000000BADA00.
+# 0xBADA0 is in the homebrew range (0x00300-0xF7FFF): title ID 000400000BADA000.
 APP_PRODUCT_CODE	:=	CTR-H-RCLW
 APP_UNIQUE_ID	:=	0xBADA0
 
@@ -63,15 +67,18 @@ APP_UNIQUE_ID	:=	0xBADA0
 # always leaves minor at 0, so FBI shows 0.1.0 as "0.0.0". The on-screen
 # version is the reliable one.
 VERSION_MAJOR	:=	0
-VERSION_MINOR	:=	1
+VERSION_MINOR	:=	2
 VERSION_MICRO	:=	0
 VERSION		:=	$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_MICRO)
 
 META		:=	meta
 ICON		:=	meta/icon.png
-# Reclawed: the RomFS is assembled at build time (it will hold the generated
-# code.ips files), so it lives under build/ and is never committed.
+# Reclawed: the RomFS is assembled at build time from the generated patches,
+# so it lives under build/ and is never committed.
 ROMFS		:=	$(BUILD)/romfs
+# Where tools/build_ips.py (or .github/scripts/build_all.sh) wrote the patches:
+# <PATCH_BUILD>/<REGION>/luma/titles/<title id>/code.ips
+PATCH_BUILD	?=	../build
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -190,18 +197,29 @@ ifneq ($(ROMFS),)
 	export _3DSXFLAGS += --romfs=$(CURDIR)/$(ROMFS)
 endif
 
-.PHONY: all clean cia
+.PHONY: all clean cia romfs test compile_commands
 
 #---------------------------------------------------------------------------------
-all: $(BUILD) $(GFXBUILD) $(DEPSDIR) $(ROMFS) $(ROMFS_T3XFILES) $(T3XHFILES)
+all: $(BUILD) $(GFXBUILD) $(DEPSDIR) romfs $(ROMFS_T3XFILES) $(T3XHFILES)
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 $(BUILD):
 	@mkdir -p $@
 
-# Reclawed: empty for now; later steps copy the built patches in here.
-$(ROMFS): | $(BUILD)
-	@mkdir -p $@
+# Reclawed: bundle every built patch as romfs:/luma/titles/<title id>/code.ips,
+# the same layout it gets on the SD card. Rebuilt on every `make` so the app
+# always carries the latest patches; the .3dsx is removed so it gets repacked
+# with the new RomFS even when no source changed.
+romfs: | $(BUILD)
+	@rm -rf $(ROMFS) $(TARGET).3dsx && mkdir -p $(ROMFS)/luma/titles
+	@found=0; \
+	for f in $(PATCH_BUILD)/*/luma/titles/*/code.ips; do \
+		[ -f "$$f" ] || continue; \
+		tid=$$(basename $$(dirname "$$f")); \
+		mkdir -p $(ROMFS)/luma/titles/$$tid && cp "$$f" $(ROMFS)/luma/titles/$$tid/ || exit 1; \
+		echo "bundling $$f"; found=1; \
+	done; \
+	[ $$found = 1 ] || { echo "No patches in $(PATCH_BUILD)/: run tools/build_ips.py first"; exit 1; }
 
 ifneq ($(GFXBUILD),$(BUILD))
 $(GFXBUILD):
@@ -227,6 +245,16 @@ cia: all
 		-DAPP_ENCRYPTED=false -DAPP_VERSION_MAJOR=$(VERSION_MAJOR) \
 		-major $(VERSION_MAJOR) -minor $(VERSION_MINOR) -micro $(VERSION_MICRO)
 	@echo built ... $(TARGET).cia
+
+#---------------------------------------------------------------------------------
+# Reclawed: PC unit tests (see tests/Makefile; pass HOSTCC=... to pick the compiler).
+test:
+	@$(MAKE) --no-print-directory -C tests
+
+# Reclawed: full rebuild that also writes build/compile_commands.json for
+# clangd and other editors.
+compile_commands: clean
+	@$(MAKE) --no-print-directory ADD_COMPILE_COMMAND=generate_compile_commands
 
 #---------------------------------------------------------------------------------
 clean:
