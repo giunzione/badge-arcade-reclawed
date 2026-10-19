@@ -71,6 +71,12 @@ make clean
 To try the install flow in an emulator without the game, `make clean && make FAKE_GAME=1`
 builds a version (marked `-fake`) that pretends Badge Arcade EUR v1.3.1 is installed.
 
+In CI, [`.github/scripts/build_installer.sh`](../.github/scripts/build_installer.sh) runs
+the same build in devkitPro's Docker image, fetching makerom and bannertool. Every
+release attaches `reclawed-installer.cia` and `.3dsx` with fixed names, so the QR code in
+the main README (made with `tools/make_qr.py`) always installs the newest one. GitHub's
+"latest" skips pre-releases, so publish installer releases as full releases.
+
 `make compile_commands` does a clean build that also writes `build/compile_commands.json`
 for clangd and other editors.
 

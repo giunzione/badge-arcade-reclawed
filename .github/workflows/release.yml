@@ -1,7 +1,11 @@
 name: Release
 
-# Builds every patches/*.toml and attaches one ready-to-extract zip per region
-# (badge-arcade-reclawed-<REGION>-<tag>.zip) to a GitHub Release.
+# Builds every patches/*.toml and attaches to a GitHub Release:
+#   - one ready-to-extract zip per region (badge-arcade-reclawed-<REGION>-<tag>.zip);
+#   - the installer app, reclawed-installer.cia and .3dsx, with every patch bundled.
+#     These names never change, so .../releases/latest/download/reclawed-installer.cia
+#     (the QR code in the README) always gets the newest one. Note that "latest"
+#     skips pre-releases: the QR code only finds full releases.
 #
 # Two ways to trigger it:
 #   1. From the browser: Releases -> "Draft a new release" -> create a tag (e.g. v0.1.0-beta)
@@ -55,4 +59,34 @@ jobs:
           files: dist/*.zip
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+          overwrite_files: true
+
+      # The built patches, for the installer job below.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-patches
+          path: build/
+          if-no-files-found: error
+
+  installer:
+    # Builds the installer with the patches above, in devkitPro's image, and
+    # attaches it to the same release (which exists by now in both cases).
+    needs: release
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-patches
+          path: build/
+
+      - name: Build the installer
+        run: .github/scripts/build_installer.sh
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
+          files: dist/reclawed-installer.*
           overwrite_files: true

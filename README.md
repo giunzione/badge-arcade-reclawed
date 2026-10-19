@@ -36,6 +36,7 @@ I wanted to see how far a purely client-side approach could go, with no server a
 | *Extra:* restoring old badges to the HOME Menu badge box | ✅ Optional side tool, [`tools/restore_badges.py`](tools/restore_badges.py) |
 | Keeping newly won badges after closing the game | ✅ Working. Stored in the game's extdata as `reclawed`, see [docs/05-home-badges.md](docs/05-home-badges.md) |
 | Theme shop, Miiverse gallery, info corner | ❔ Untested |
+| Installer app: install from the console with a QR code, no PC needed | 🆕 New, see [Installation](#installation) |
 
 The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead, and sends the badges you win to the HOME Menu badge box at the end of each crane session.
 
@@ -51,7 +52,7 @@ This case was found and tested by a French 3DS fan who reached out right after t
 
 ### Planned
 
-- **One-step installer app.** A small app you install with FBI (scan a QR code, no PC needed) that checks your game and SpotPass data, copies the patch to the right place and turns on Luma's *Enable game patching* for you if it's off. No more taking out the SD card. It will also be available on Universal-Updater.
+- **Installer app, next steps.** A listing on Universal-Updater, and a warning when the game's SpotPass data (`boss.sarc`) is missing.
 - **Badges in the HOME Menu right away.** Today they appear in the badge box after you open the badge book once, or at the next launch. The export is already triggered at the end of each session; it only needs to run without waiting for the badge book.
 - **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
 - **Faster loading**, if possible. Some of the wait at boot may come from steps meant for the online service. To be investigated, no promises.
@@ -72,15 +73,31 @@ This case was found and tested by a French 3DS fan who reached out right after t
 
 ## Installation
 
-1. **Back up first** (recommended, not required). Use [Checkpoint](https://github.com/BernardoGiordano/Checkpoint) to back up the game's extdata. If you have badges in your HOME Menu badge box, also dump them with [Simple Badge Injector](https://github.com/AntiMach/simple-badge-injector): the patched game still runs its own badge-update step at boot, so it's worth keeping a copy. Neither tool is needed for the patch to work.
-2. Download the zip for your region from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) (e.g. `badge-arcade-reclawed-EUR-….zip`) and extract it to the root of your SD card, so that you get `luma/titles/<title id>/code.ips`.
-3. Open the Luma3DS configuration menu (hold <kbd>SELECT</kbd> while powering on) and enable **"Enable game patching"**.
+**Back up first** (recommended, not required). Use [Checkpoint](https://github.com/BernardoGiordano/Checkpoint) to back up the game's extdata. If you have badges in your HOME Menu badge box, also dump them with [Simple Badge Injector](https://github.com/AntiMach/simple-badge-injector): the patched game still runs its own badge-update step at boot, so it's worth keeping a copy. Neither tool is needed for the patch to work.
+
+### With the installer app (no PC needed)
+
+<p align="center">
+  <img src="docs/install-qr.png" alt="QR code: latest reclawed-installer.cia" width="240">
+</p>
+
+1. Connect the console to the internet, open **FBI**, choose **Remote Install → Scan QR Code** and scan the code above. Confirm the install.
+2. Open **Reclawed Installer** from the HOME Menu. It checks your console and lists what it finds: Luma3DS, the game and its v1.3.1 update, the patch, and Luma's settings. Anything that blocks the install is shown in red.
+3. Choose **Install**. The app copies the patch to `luma/titles/<title id>/code.ips` and turns on Luma's **"Enable game patching"** (after saving a backup of `luma/config.ini`), then restarts the console.
 4. Launch Nintendo Badge Arcade.
+
+The QR code always points to the newest release. Without a camera, download `reclawed-installer.cia` from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) and install it from the SD card with FBI. The app's **Uninstall** button removes the patch again. Details are in [`installer/README.md`](installer/README.md).
+
+### By hand
+
+1. Download the zip for your region from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) (e.g. `badge-arcade-reclawed-EUR-….zip`) and extract it to the root of your SD card, so that you get `luma/titles/<title id>/code.ips`.
+2. Open the Luma3DS configuration menu (hold <kbd>SELECT</kbd> while powering on) and enable **"Enable game patching"**.
+3. Launch Nintendo Badge Arcade.
+
+To uninstall, delete `code.ips`. The installed game is never modified.
 
 > [!TIP]
 > The game takes **a long time to load**, especially on the title screen. Don't panic: it isn't frozen, just give it a moment.
-
-To uninstall, delete `code.ips`. The installed game is never modified.
 
 ### Building from source
 
@@ -94,6 +111,8 @@ python3 tools/build_ips.py --set anchor_date=2018-07-20 # if your boss.sarc cove
 ```
 
 The output goes to `build/<region>/luma/titles/<title id>/code.ips` (for EUR: `build/EUR/luma/titles/0004000000153600/code.ips`). If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
+
+The installer app lives in [`installer/`](installer/) and bundles every patch built this way; see its [README](installer/README.md) for how to build it (devkitPro). Every release rebuilds it with the latest patches.
 
 ---
 
