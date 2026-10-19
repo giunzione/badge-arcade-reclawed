@@ -77,7 +77,9 @@ bool installed_parse(const char *text, size_t len, InstalledRecord *out)
 			if (!((hash[i] >= '0' && hash[i] <= '9') || (hash[i] >= 'a' && hash[i] <= 'f')))
 				return false;
 
-		snprintf(out->release, sizeof(out->release), "%s", release);
+		/* valid_release() already checked that it fits in out->release
+		 * (gcc can't see that and flags snprintf with -Wformat-truncation). */
+		memcpy(out->release, release, strlen(release) + 1);
 		out->code = code;
 		out->version = (unsigned)version;
 		memcpy(out->sha256, hash, SHA256_HEX_LEN + 1);
