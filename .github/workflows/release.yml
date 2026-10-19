@@ -2,7 +2,11 @@ name: Release
 
 # Builds every patches/*.toml and attaches to a GitHub Release:
 #   - one ready-to-extract zip per region (badge-arcade-reclawed-<REGION>-<tag>.zip);
-#   - the installer app, reclawed-installer.cia and .3dsx, with every patch bundled.
+#   - the patch manifest, patches.txt + patch-<REGION>-<code>.ips: the installer app
+#     downloads these from the latest release, so new patches reach users without
+#     reinstalling the app;
+#   - the installer app, reclawed-installer.cia and .3dsx, with every patch bundled
+#     (its offline fallback).
 #     These names never change, so .../releases/latest/download/reclawed-installer.cia
 #     (the QR code in the README) always gets the newest one. Note that "latest"
 #     skips pre-releases: the QR code only finds full releases.
@@ -44,19 +48,25 @@ jobs:
       - name: Build all regions
         run: .github/scripts/build_all.sh "$GITHUB_REF_NAME"
 
-      # Release created in the browser: attach the zip to it.
+      # Release created in the browser: attach the zips and the patch manifest to it.
       - if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/patches.txt
+            dist/patch-*.ips
           overwrite_files: true
 
       # Tag pushed from a terminal: create the release.
       - if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            dist/patches.txt
+            dist/patch-*.ips
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           overwrite_files: true

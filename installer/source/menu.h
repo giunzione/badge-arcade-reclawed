@@ -44,8 +44,9 @@ typedef struct
 /* Everything enabled except what menu_update() turns off; toggle on. */
 void menu_init(Menu *m);
 
-/* Enable items from the checks: Install when there is something to install,
- * Uninstall when a patch is on the SD, Restart when the console can restart.
+/* Enable items from the checks: Install when there is something to install
+ * (or, labelled "Report", when the game's version has no patch), Uninstall
+ * when a patch is on the SD, Restart when the console can restart.
  * Moves the selection off a disabled item. */
 void menu_update(Menu *m, const CheckReport *r, bool can_restart);
 

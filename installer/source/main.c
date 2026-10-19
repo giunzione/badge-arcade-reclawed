@@ -1,13 +1,20 @@
 /*
  * Badge Arcade Reclawed installer - entry point, input and actions.
  *
+ * At start the console is probed (probe.c) and a background thread looks for
+ * the latest patches on GitHub (online.c). Until it is done the checks say
+ * "Checking online"; then the patch for the installed game is chosen: the
+ * latest release's, or the app's built-in copy when offline.
+ *
  * Every frame: read the buttons and the touch screen, act on them, draw
- * (ui.c). The state of the console is probed at start and again after every
- * action (probe.c -> checks.c), so the screens always show what is on the SD.
+ * (ui.c). The state is probed again after every action, so the screens always
+ * show what is on the SD.
  *
  * Actions:
- *   Install   copy the patch for the detected game, enable game patching,
- *             then restart after a 3-second countdown if the toggle is on
+ *   Install   write the chosen patch for the detected game, enable game
+ *             patching, then restart after a 3-second countdown if the toggle is on
+ *   Report    (instead of Install, when the game's version has no patch)
+ *             QR code to a pre-filled GitHub issue
  *   Uninstall delete the patch from the SD (after a confirmation)
  *   Restart   restart the console, so Luma applies the new settings
  *   Exit      back to the HOME Menu / Homebrew Launcher (also START)
@@ -18,7 +25,10 @@
 #include "checks.h"
 #include "installer.h"
 #include "menu.h"
+#include "net.h"
+#include "online.h"
 #include "probe.h"
+#include "report.h"
 #include "ui.h"
 
 #ifndef APP_VERSION
@@ -27,17 +37,47 @@
 
 #define COUNTDOWN_FRAMES (3 * 60)
 
+static SystemState state;
 static CheckReport report;
 static Menu menu;
 static UiState ui;
+static OnlineJob job;
+static bool job_started;
 
-/* Probe the console again and update what the menu allows. */
+#ifdef RECLAWED_TEST_LOG
+/* Test builds (FAKE_GAME / ONLINE_BASE) append every check result to a file on
+ * the SD, so the simulated cases can be verified without reading the screen. */
+static void test_log(void)
+{
+	FILE *f = fopen("sdmc:/3ds/badge-arcade-reclawed/test-log.txt", "a");
+	if (!f)
+		return;
+	static const char *const levels[] = {"ok", "info", "warn", "STOP"};
+	fprintf(f, "--- v%s checking=%d can_install=%d nothing_to_do=%d target=%d report=%d uninstall=%d\n",
+	        APP_VERSION, report.checking, report.can_install, report.nothing_to_do, report.target,
+	        report.report_target, report.uninstall_target);
+	for (int i = 0; i < report.count; i++)
+		fprintf(f, "[%s] %s\n", levels[report.items[i].level], report.items[i].text);
+	fclose(f);
+}
+#endif
+
+/* Probe the console again, pick the patches and update what the menu allows. */
 static void refresh(void)
 {
-	SystemState state;
 	probe_system(&state);
+	probe_resolve(&state, job_started ? &job : NULL);
+	if (!job_started) /* no network at all: decide with the built-in patches now */
+	{
+		job.finished = true;
+		job.status = NET_ERR_INIT;
+		probe_resolve(&state, &job);
+	}
 	checks_run(&state, &report);
 	menu_update(&menu, &report, true);
+#ifdef RECLAWED_TEST_LOG
+	test_log();
+#endif
 }
 
 static void add_line(const char *label, InstResult r, const char *msg)
@@ -77,11 +117,13 @@ static bool restart_console(void)
 
 static void do_install(void)
 {
-	char bundled[96], on_sd[96], msg[96];
+	char on_sd[96], msg[96];
+	size_t size;
+	const unsigned char *ips = probe_patch_data(report.target, &size);
 	ui.line_count = 0;
-	probe_patch_paths(report.target, bundled, on_sd, sizeof(bundled));
+	probe_sd_patch_path(report.target, on_sd, sizeof(on_sd));
 
-	InstResult patch = inst_copy_patch(bundled, on_sd, msg, sizeof(msg));
+	InstResult patch = inst_write_patch(ips, size, on_sd, msg, sizeof(msg));
 	add_line("Patch", patch, msg);
 	InstResult cfg = INST_FAILED;
 	if (patch != INST_FAILED)
@@ -97,11 +139,26 @@ static void do_install(void)
 	refresh();
 }
 
+/* Show the QR code for a GitHub issue about this game version. */
+static void open_report(void)
+{
+	int t = report.report_target;
+	char luma[24], url[REPORT_URL_MAX];
+	snprintf(luma, sizeof(luma), "%u.%u.%u", state.luma_version[0], state.luma_version[1],
+	         state.luma_version[2]);
+	if (report_issue_url(url, sizeof(url), GAME_TITLES[t].region, GAME_TITLES[t].base_tid,
+	                     state.game[t].code, state.game[t].code_version, APP_VERSION,
+	                     state.luma_detected ? luma : NULL) != 0)
+		snprintf(url, sizeof(url), REPORT_REPO_URL "/issues/new");
+	ui_set_report_url(url);
+	ui.dialog = DIALOG_REPORT;
+}
+
 static void do_uninstall(void)
 {
-	char bundled[96], on_sd[96], msg[96];
+	char on_sd[96], msg[96];
 	ui.line_count = 0;
-	probe_patch_paths(report.uninstall_target, bundled, on_sd, sizeof(bundled));
+	probe_sd_patch_path(report.uninstall_target, on_sd, sizeof(on_sd));
 	InstResult r = inst_remove_patch(on_sd, msg, sizeof(msg));
 	add_line("Patch", r, msg);
 	open_result(r == INST_FAILED ? "Uninstall failed" : "Uninstalled", r == INST_FAILED);
@@ -129,7 +186,12 @@ static bool activate(MenuItem item)
 	menu.selected = item;
 	switch (item)
 	{
-	case ITEM_INSTALL: do_install(); break;
+	case ITEM_INSTALL:
+		if (report.can_install)
+			do_install();
+		else if (report.report_target >= 0)
+			open_report();
+		break;
 	case ITEM_UNINSTALL: ui.dialog = DIALOG_CONFIRM_UNINSTALL; break;
 	case ITEM_RESTART: do_restart(); break;
 	case ITEM_EXIT: return false;
@@ -145,6 +207,12 @@ static void dialog_input(u32 down, int button)
 	bool yes = (down & KEY_A) || button == 1;
 	bool no = (down & KEY_B) || button == 2;
 
+	if (ui.dialog == DIALOG_REPORT)
+	{
+		if (yes || no)
+			ui.dialog = DIALOG_NONE;
+		return;
+	}
 	if (ui.dialog == DIALOG_CONFIRM_UNINSTALL)
 	{
 		if (yes)
@@ -171,7 +239,7 @@ static void dialog_input(u32 down, int button)
 
 int main(void)
 {
-	romfsInit(); /* the bundled patches; probe reports them missing if this fails */
+	romfsInit(); /* the built-in patches and certificates */
 	amInit();    /* installed titles; without it the game shows as not installed */
 	if (!ui_init())
 	{
@@ -179,11 +247,18 @@ int main(void)
 		return 1;
 	}
 
+	/* Local state first, then the online check in the background. */
 	menu_init(&menu);
+	probe_system(&state);
+	probe_online_wants(&state, &job);
+	job_started = net_init() && online_start(&job);
 	refresh();
 
 	while (aptMainLoop())
 	{
+		if (report.checking && online_done(&job))
+			refresh(); /* the online check just ended */
+
 		hidScanInput();
 		u32 down = hidKeysDown();
 
@@ -219,6 +294,14 @@ int main(void)
 		ui_draw(&report, &menu, &ui, APP_VERSION);
 	}
 
+	/* Stop a download that may still be running before tearing things down. */
+	net_cancel();
+	if (job_started)
+		while (!online_done(&job))
+			svcSleepThread(10 * 1000 * 1000);
+	online_free(&job);
+	probe_free();
+	net_exit();
 	ui_exit();
 	amExit();
 	romfsExit();

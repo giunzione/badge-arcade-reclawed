@@ -40,7 +40,8 @@ void menu_init(Menu *m)
 void menu_update(Menu *m, const CheckReport *r, bool can_restart)
 {
 	bool install = r->can_install && !r->nothing_to_do;
-	m->enabled[ITEM_INSTALL] = install;
+	/* The first button is "Report" when the game has no patch for its version. */
+	m->enabled[ITEM_INSTALL] = install || r->report_target >= 0;
 	m->enabled[ITEM_RESTART_AFTER] = install;
 	m->enabled[ITEM_UNINSTALL] = r->uninstall_target >= 0;
 	m->enabled[ITEM_RESTART] = can_restart;

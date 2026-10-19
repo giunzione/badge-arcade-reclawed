@@ -21,9 +21,10 @@ CFLAGS	+=	-D_CRT_SECURE_NO_WARNINGS
 endif
 
 SOURCES	:=	../source/luma_config.c ../source/fileops.c ../source/ips.c ../source/installer.c \
-		../source/titles.c ../source/checks.c ../source/menu.c
+		../source/titles.c ../source/checks.c ../source/menu.c \
+		../source/sha256.c ../source/manifest.c ../source/report.c ../source/net_status.c
 TESTS	:=	run_tests.c test_luma_config.c test_ips.c test_fileops.c test_installer.c \
-		test_checks.c test_menu.c
+		test_checks.c test_menu.c test_manifest.c
 
 .PHONY: test clean
 

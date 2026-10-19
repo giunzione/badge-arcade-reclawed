@@ -11,6 +11,7 @@
 #include <3ds.h>
 #include <citro2d.h>
 
+#include "qrcodegen.h"
 #include "sprites.h"     /* tex3ds: sprite indices */
 #include "sprites_t3x.h" /* the sprite sheet, linked into the app */
 
@@ -44,9 +45,22 @@
 #define DLG_BTN_Y (DLG_Y + DLG_H - DLG_BTN_H - 12)
 #define DLG_BTN_W ((DLG_W - 36) / 2)
 
+/* Report dialog: QR code area and its close button (bottom screen) */
+#define QR_MAX_VERSION 12 /* 65 modules: still 3 px each on the screen */
+#define QR_BOX 196
+#define QR_X 6
+#define QR_Y 38
+#define CLOSE_X 210
+#define CLOSE_Y 192
+#define CLOSE_W 102
+#define CLOSE_H 36
+
 static C3D_RenderTarget *top_target, *bottom_target;
 static C2D_TextBuf text_buf;
 static C2D_SpriteSheet sprites;
+static uint8_t qr[qrcodegen_BUFFER_LEN_FOR_VERSION(QR_MAX_VERSION)];
+static bool qr_ok;
+static unsigned frame; /* for the "checking" animation */
 
 bool ui_init(void)
 {
@@ -142,8 +156,8 @@ static void draw_top(const CheckReport *r, const char *version)
 	char v[40];
 	snprintf(v, sizeof(v), "v%s", version);
 	text(v, TOP_W - 8, 4, 0.42f, COL_DIM, C2D_AlignRight);
-	if (strstr(version, "fake"))
-		text("TEST BUILD: fake game", 8, 4, 0.42f, COL_RED, 0);
+	if (strstr(version, "fake") || strstr(version, "test"))
+		text("TEST BUILD", 8, 4, 0.42f, COL_RED, 0);
 
 	/* "powered by" + the Divisione3DSAntimog logo, bottom-right corner. */
 	if (sprites)
@@ -178,7 +192,19 @@ static void draw_status(const CheckReport *r)
 {
 	const char *s;
 	u32 color;
-	if (r->nothing_to_do)
+	static const char *const checking[] = {"Checking online   ", "Checking online.  ",
+	                                       "Checking online.. ", "Checking online..."};
+	if (r->checking)
+	{
+		s = checking[(frame / 20) % 4];
+		color = COL_CYAN;
+	}
+	else if (r->report_target >= 0)
+	{
+		s = "No patch for your game version";
+		color = COL_RED;
+	}
+	else if (r->nothing_to_do)
 	{
 		s = "Everything is installed";
 		color = COL_GREEN;
@@ -197,18 +223,21 @@ static void draw_status(const CheckReport *r)
 	text_in_box(s, 0, 0, BOTTOM_W, 36, 0.6f, color);
 }
 
-static void draw_button(const Menu *m, MenuItem item)
+static void draw_button(const CheckReport *r, const Menu *m, MenuItem item)
 {
 	MenuRect b = menu_item_rect(item);
 	bool on = m->enabled[item];
 	bool sel = on && m->selected == item;
 	bool primary = item == ITEM_INSTALL && on;
+	/* No patch for this version: the first button reports it instead. */
+	const char *label = item == ITEM_INSTALL && !r->can_install && r->report_target >= 0
+	                        ? "Report" : ITEM_LABELS[item];
 
 	if (sel) /* selection ring */
 		round_rect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 9, primary ? COL_TEXT : COL_GOLD);
 	u32 fill = !on ? COL_PANEL_OFF : primary ? (sel ? COL_GOLD_HI : COL_GOLD) : sel ? COL_PANEL_HI : COL_PANEL;
 	round_rect(b.x, b.y, b.w, b.h, 7, fill);
-	text_in_box(ITEM_LABELS[item], b.x, b.y, b.w, b.h, 0.65f,
+	text_in_box(label, b.x, b.y, b.w, b.h, 0.65f,
 	            !on ? COL_OFF : primary ? COL_INK : COL_TEXT);
 }
 
@@ -238,8 +267,59 @@ static void dialog_button(float x, const char *label, bool primary)
 	text_in_box(label, x, DLG_BTN_Y, DLG_BTN_W, DLG_BTN_H, 0.55f, primary ? COL_INK : COL_TEXT);
 }
 
+bool ui_set_report_url(const char *url)
+{
+	uint8_t temp[qrcodegen_BUFFER_LEN_FOR_VERSION(QR_MAX_VERSION)];
+	qr_ok = qrcodegen_encodeText(url, temp, qr, qrcodegen_Ecc_LOW, qrcodegen_VERSION_MIN,
+	                             QR_MAX_VERSION, qrcodegen_Mask_AUTO, true);
+	return qr_ok;
+}
+
+/* The QR code in a white square, dark modules drawn as one rectangle per run. */
+static void draw_qr(float x, float y, float box)
+{
+	C2D_DrawRectSolid(x, y, 0.5f, box, box, COL_TEXT);
+	if (!qr_ok)
+		return;
+	int n = qrcodegen_getSize(qr);
+	int px = (int)box / (n + 8); /* 4 modules of quiet zone on each side */
+	float ox = x + (box - px * n) / 2.0f, oy = y + (box - px * n) / 2.0f;
+	for (int row = 0; row < n; row++)
+		for (int col = 0; col < n;)
+		{
+			if (!qrcodegen_getModule(qr, col, row))
+			{
+				col++;
+				continue;
+			}
+			int run = col;
+			while (run < n && qrcodegen_getModule(qr, run, row))
+				run++;
+			C2D_DrawRectSolid(ox + col * px, oy + row * px, 0.5f, (run - col) * px, px, COL_INK);
+			col = run;
+		}
+}
+
+static void draw_report(void)
+{
+	C2D_DrawRectSolid(0, 0, 0.5f, BOTTOM_W, SCREEN_H, COL_BG);
+	text_in_box("No patch for your game version yet", 0, 4, BOTTOM_W, 28, 0.55f, COL_GOLD_HI);
+	draw_qr(QR_X, QR_Y, QR_BOX);
+	text_wrap("Scan this with your phone: it opens a GitHub issue already filled in "
+	          "with your game's version. Just submit it.\n\n"
+	          "Please don't upload any game files.",
+	          CLOSE_X, QR_Y, 0.42f, COL_TEXT, CLOSE_W);
+	round_rect(CLOSE_X, CLOSE_Y, CLOSE_W, CLOSE_H, 6, COL_GOLD);
+	text_in_box("(B) Close", CLOSE_X, CLOSE_Y, CLOSE_W, CLOSE_H, 0.55f, COL_INK);
+}
+
 static void draw_dialog(const UiState *u)
 {
+	if (u->dialog == DIALOG_REPORT)
+	{
+		draw_report();
+		return;
+	}
 	C2D_DrawRectSolid(0, 0, 0.5f, BOTTOM_W, SCREEN_H, COL_SHADE);
 	round_rect(DLG_X, DLG_Y, DLG_W, DLG_H, 10, COL_PANEL);
 	float left = DLG_X + 12, right = DLG_X + DLG_W - 12 - DLG_BTN_W;
@@ -289,10 +369,10 @@ static void draw_bottom(const CheckReport *r, const Menu *m, const UiState *u)
 	C2D_SceneBegin(bottom_target);
 
 	draw_status(r);
-	draw_button(m, ITEM_INSTALL);
-	draw_button(m, ITEM_UNINSTALL);
-	draw_button(m, ITEM_RESTART);
-	draw_button(m, ITEM_EXIT);
+	draw_button(r, m, ITEM_INSTALL);
+	draw_button(r, m, ITEM_UNINSTALL);
+	draw_button(r, m, ITEM_RESTART);
+	draw_button(r, m, ITEM_EXIT);
 	draw_toggle(m);
 	text("D-Pad / touch: choose    (A) select    START: exit", BOTTOM_W / 2.0f, 222, 0.4f,
 	     COL_DIM, C2D_AlignCenter);
@@ -303,6 +383,7 @@ static void draw_bottom(const CheckReport *r, const Menu *m, const UiState *u)
 
 void ui_draw(const CheckReport *r, const Menu *m, const UiState *u, const char *version)
 {
+	frame++;
 	C2D_TextBufClear(text_buf);
 	C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 	draw_top(r, version);
@@ -312,6 +393,8 @@ void ui_draw(const CheckReport *r, const Menu *m, const UiState *u, const char *
 
 int ui_dialog_button_at(const UiState *u, int x, int y)
 {
+	if (u->dialog == DIALOG_REPORT)
+		return x >= CLOSE_X && x < CLOSE_X + CLOSE_W && y >= CLOSE_Y && y < CLOSE_Y + CLOSE_H ? 2 : 0;
 	if (u->dialog == DIALOG_NONE || y < DLG_BTN_Y || y >= DLG_BTN_Y + DLG_BTN_H)
 		return 0;
 	int left = DLG_X + 12, right = DLG_X + DLG_W - 12 - DLG_BTN_W;

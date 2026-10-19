@@ -13,7 +13,21 @@ static CheckReport report(bool can_install, bool nothing_to_do, int uninstall_ta
 	r.nothing_to_do = nothing_to_do;
 	r.uninstall_target = uninstall_target;
 	r.target = can_install ? 0 : -1;
+	r.report_target = -1;
 	return r;
+}
+
+static void report_mode(void)
+{
+	/* No patch for the game's version: the first button reports it. */
+	Menu m;
+	menu_init(&m);
+	CheckReport r = report(false, false, -1);
+	r.report_target = 0;
+	menu_update(&m, &r, true);
+	CHECK(m.enabled[ITEM_INSTALL]);
+	CHECK(!m.enabled[ITEM_RESTART_AFTER]); /* nothing will be installed */
+	CHECK(m.selected == ITEM_INSTALL);
 }
 
 static void enabled_items(void)
@@ -124,6 +138,7 @@ static void touch_layout(void)
 void test_menu(void)
 {
 	enabled_items();
+	report_mode();
 	selection_leaves_disabled_items();
 	dpad_moves();
 	dpad_skips_disabled();

@@ -17,8 +17,11 @@ typedef enum
 	INST_FAILED,  /* nothing was changed; see the message */
 } InstResult;
 
-/* Copy the IPS at `src` to `dst`, creating folders as needed. The source is
- * checked to be a valid IPS first, and the copy is read back. */
+/* Write the IPS in memory to `dst`, creating folders as needed. The data is
+ * checked to be a valid IPS first, and the written file is read back. */
+InstResult inst_write_patch(const void *ips, size_t size, const char *dst, char *msg, size_t msg_len);
+
+/* Same, reading the IPS from the file `src`. */
 InstResult inst_copy_patch(const char *src, const char *dst, char *msg, size_t msg_len);
 
 /* Delete the installed patch at `path` (uninstall). Game patching is left on:

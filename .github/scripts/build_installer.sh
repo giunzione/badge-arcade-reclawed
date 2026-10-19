@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Build the installer app (.3dsx and .cia) with the patches already built in build/
-# (run build_all.sh or tools/build_ips.py first).
+# Build the installer app (.3dsx and .cia) with the patch manifest already built
+# in build/patches/ (run build_all.sh, or tools/build_ips.py + tools/make_manifest.py).
 #
 # Meant for the devkitpro/devkitarm image, which has devkitARM, libctru and
-# citro2d but not the CIA tools: makerom and bannertool are downloaded (pinned
-# versions, checked against SHA-256) when they aren't on the PATH.
+# citro2d but not libcurl or the CIA tools: 3ds-curl comes from devkitPro's
+# repository; makerom and bannertool are downloaded (pinned versions, checked
+# against SHA-256) when they aren't on the PATH.
 #
 # Usage: .github/scripts/build_installer.sh   -> dist/reclawed-installer.{cia,3dsx}
 set -euo pipefail
@@ -27,6 +28,11 @@ fetch() {
   unzip -o -j -q "$zip" "$3" -d "$tools"
   chmod +x "$tools/$4"
 }
+
+# libcurl + mbedTLS for the online patch check: in devkitPro's repository, not in the image.
+if [ ! -f "${DEVKITPRO:-/opt/devkitpro}/portlibs/3ds/lib/libcurl.a" ]; then
+  dkp-pacman -Sy --noconfirm --needed 3ds-curl
+fi
 
 command -v makerom >/dev/null || fetch "$MAKEROM_URL" "$MAKEROM_SHA256" makerom makerom
 command -v bannertool >/dev/null || fetch "$BANNERTOOL_URL" "$BANNERTOOL_SHA256" linux-x86_64/bannertool bannertool

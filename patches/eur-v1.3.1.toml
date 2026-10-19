@@ -19,6 +19,11 @@ region    = "EUR"            # used to name build/<region>/ and the release zip
 version   = "1.3.1"
 title_id  = "0004000000153600"
 code_base = 0x100000
+# Exactly which code this patch is for, so the installer app can match it to
+# the game on the console: "update" (the update title runs) or "base" (no
+# update installed), and that title's version as the system reports it.
+code_title   = "update"       # 0004000E00153600
+code_version = 5136           # v1.3.1
 
 [vars]
 plays       = 10           # free plays per crane visit (1-255)

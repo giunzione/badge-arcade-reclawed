@@ -1,9 +1,10 @@
 /*
  * checks - see checks.h.
  *
- * Order of the lines on screen: Luma3DS, the game, its update, the patch on
- * the SD, the Luma config. A CHECK_STOP anywhere blocks the install; the
- * remaining lines are still shown so the user sees everything at once.
+ * Order of the lines on screen: Luma3DS, the game and its version, where the
+ * patch comes from, the patch on the SD, the Luma config. A CHECK_STOP
+ * anywhere blocks the install; the remaining lines are still shown so the
+ * user sees everything at once.
  */
 #include "checks.h"
 
@@ -25,26 +26,21 @@ static void add(CheckReport *r, CheckLevel level, const char *fmt, ...)
 		r->can_install = false;
 }
 
-/* Pick the installed game to patch: the first installed region with a bundled
- * patch. Returns -1 and explains on screen when there is none. */
-static int pick_target(const SystemState *s, CheckReport *r)
+/* The installed game to work on: the first one a patch exists for, else the
+ * first installed one (it will get the "no patch" line). -1 if none. */
+static int pick_game(const SystemState *s)
 {
-	int installed = -1;
+	int first = -1;
 	for (int i = 0; i < GAME_TITLE_COUNT; i++)
 	{
 		if (!s->game[i].installed)
 			continue;
-		if (s->game[i].patch_bundled)
+		if (s->game[i].source != SOURCE_NONE)
 			return i;
-		if (installed < 0)
-			installed = i;
+		if (first < 0)
+			first = i;
 	}
-	if (installed >= 0)
-		add(r, CHECK_STOP, "Badge Arcade %s: no patch for it yet",
-		    GAME_TITLES[installed].region);
-	else
-		add(r, CHECK_STOP, "Nintendo Badge Arcade is not installed");
-	return -1;
+	return first;
 }
 
 static void check_luma(const SystemState *s, CheckReport *r)
@@ -58,16 +54,70 @@ static void check_luma(const SystemState *s, CheckReport *r)
 		    s->luma_version[2]);
 }
 
-static void check_update(const SystemState *s, int t, CheckReport *r)
+/* "Badge Arcade EUR v1.3.1", or the raw title version when it isn't the known final update. */
+static void check_game(const SystemState *s, int t, CheckReport *r)
 {
 	const GameTitle *g = &GAME_TITLES[t];
-	if (!s->game[t].update_installed)
-		add(r, CHECK_STOP, "Update v1.3.1 is not installed");
-	else if (s->game[t].update_version != g->update_version)
-		add(r, CHECK_STOP, "Update is v%u, the patch needs v%u",
-		    s->game[t].update_version, (unsigned)g->update_version);
+	if (s->game[t].code == CODE_UPDATE && s->game[t].code_version == g->update_version)
+		add(r, CHECK_OK, "Badge Arcade %s v1.3.1", g->region);
+	else if (s->game[t].code == CODE_UPDATE)
+		add(r, CHECK_OK, "Badge Arcade %s, update v%u", g->region, s->game[t].code_version);
 	else
-		add(r, CHECK_OK, "Update v1.3.1 installed");
+		add(r, CHECK_OK, "Badge Arcade %s, no update (v%u)", g->region, s->game[t].code_version);
+}
+
+/* Where the patch comes from. Returns true if there is one to install. */
+static bool check_source(const SystemState *s, int t, CheckReport *r)
+{
+	if (s->online == ONLINE_CHECKING)
+	{
+		add(r, CHECK_INFO, "Checking online for patches...");
+		r->checking = true;
+		r->can_install = false;
+		return false;
+	}
+	if (s->online == ONLINE_FAILED)
+		add(r, CHECK_WARN, "Online check failed: %s", net_status_str(s->online_error));
+
+	/* Why the latest release's patch isn't used, when it is listed or should be.
+	 * Without a built-in copy to fall back on, these block the install. */
+	bool fallback = s->game[t].source == SOURCE_BUILTIN;
+	switch (s->game[t].fetch)
+	{
+	case FETCH_BAD_HASH:
+		/* Corrupted or tampered with: the download was discarded. */
+		add(r, fallback ? CHECK_WARN : CHECK_STOP, "Online patch failed its security check");
+		break;
+	case FETCH_FAILED:
+		add(r, fallback ? CHECK_WARN : CHECK_STOP, "Online patch download failed");
+		break;
+	case FETCH_NOT_LISTED:
+		if (fallback)
+			add(r, CHECK_INFO, "Not in the latest release");
+		break;
+	case FETCH_NOT_TRIED:
+	case FETCH_OK:
+		break;
+	}
+
+	switch (s->game[t].source)
+	{
+	case SOURCE_ONLINE:
+		add(r, CHECK_OK, "Patch from %s (online)", s->game[t].patch_release);
+		return true;
+	case SOURCE_BUILTIN:
+		add(r, CHECK_OK, "Using the built-in patch (%s)", s->game[t].patch_release);
+		return true;
+	case SOURCE_NONE:
+		break;
+	}
+	/* A patch exists but couldn't be fetched: already explained above, and
+	 * nothing to report. */
+	if (s->game[t].fetch == FETCH_BAD_HASH || s->game[t].fetch == FETCH_FAILED)
+		return false;
+	add(r, CHECK_STOP, "No patch for this game version yet");
+	r->report_target = t;
+	return false;
 }
 
 /* Returns true if the config still needs game patching turned on. */
@@ -100,35 +150,41 @@ void checks_run(const SystemState *s, CheckReport *out)
 	memset(out, 0, sizeof(*out));
 	out->can_install = true;
 	out->target = -1;
+	out->report_target = -1;
 
 	check_luma(s, out);
 
-	int t = pick_target(s, out);
-	bool patch_needed = false;
-	if (t >= 0)
+	int t = pick_game(s);
+	bool patch_needed = false, have_patch = false;
+	if (t < 0)
+		add(out, CHECK_STOP, "Nintendo Badge Arcade is not installed");
+	else
 	{
-		out->target = t;
-		add(out, CHECK_OK, "Badge Arcade %s installed", GAME_TITLES[t].region);
-		check_update(s, t, out);
-		switch (s->game[t].sd_patch)
+		check_game(s, t, out);
+		have_patch = check_source(s, t, out);
+		if (have_patch)
 		{
-		case PATCH_SAME:
-			add(out, CHECK_OK, "Patch installed and up to date");
-			break;
-		case PATCH_DIFFERENT:
-			add(out, CHECK_WARN, "Other patch on SD, will be replaced");
-			patch_needed = true;
-			break;
-		case PATCH_NOT_ON_SD:
-			add(out, CHECK_INFO, "Patch will be installed");
-			patch_needed = true;
-			break;
+			out->target = t;
+			switch (s->game[t].sd_patch)
+			{
+			case PATCH_SAME:
+				add(out, CHECK_OK, "Patch installed and up to date");
+				break;
+			case PATCH_DIFFERENT:
+				add(out, CHECK_WARN, "Other patch on SD, will be replaced");
+				patch_needed = true;
+				break;
+			case PATCH_NOT_ON_SD:
+				add(out, CHECK_INFO, "Patch will be installed");
+				patch_needed = true;
+				break;
+			}
 		}
 	}
 
 	bool config_needed = check_config(s, out);
 
-	if (t < 0)
+	if (!have_patch)
 		out->can_install = false;
 	out->nothing_to_do = out->can_install && !patch_needed && !config_needed;
 

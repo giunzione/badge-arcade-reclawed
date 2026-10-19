@@ -1,0 +1,61 @@
+name: Patch request for my game version
+description: The installer app says there is no patch for your version of Badge Arcade.
+title: "Patch request: "
+labels: ["game version"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! If you came here from the installer app's QR code, the
+        fields below are already filled in: just check them and press **Submit**.
+
+        **Please don't attach or link any game files** (`.cia`, `.3ds`, `.app`, `.code`,
+        dumps of any kind). They belong to Nintendo and can't be shared here. To port the
+        patch we compare the game's code on our side; if we need your help to check
+        something, we'll ask in the comments.
+
+  - type: input
+    id: region
+    attributes:
+      label: Region
+      placeholder: EUR, USA or JPN
+    validations:
+      required: true
+
+  - type: input
+    id: title_id
+    attributes:
+      label: Title ID
+      description: The base game's title ID.
+      placeholder: "0004000000153600"
+    validations:
+      required: true
+
+  - type: input
+    id: game_version
+    attributes:
+      label: Game version
+      description: >-
+        "u" + the update's title version (e.g. u5136 = update v1.3.1), or "b" + the base
+        game's version when no update is installed.
+      placeholder: u5136
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: Installer app version
+      placeholder: 0.4.0
+
+  - type: input
+    id: luma_version
+    attributes:
+      label: Luma3DS version
+      placeholder: 13.3.2
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Console model, where the game came from (eShop download, update installed or not), ...

@@ -27,25 +27,27 @@ static InstResult report(InstResult r, char *msg, size_t msg_len, const char *fm
 	return r;
 }
 
+InstResult inst_write_patch(const void *ips, size_t size, const char *dst, char *msg, size_t msg_len)
+{
+	unsigned records;
+	if (!ips || !ips_is_valid(ips, size, &records))
+		return report(INST_FAILED, msg, msg_len, "patch file is damaged");
+	if (fops_same_content(dst, ips, size))
+		return report(INST_ALREADY, msg, msg_len, "patch already installed");
+	if (fops_mkdirs_for(dst) != 0)
+		return report(INST_FAILED, msg, msg_len, "can't create the patch folder");
+	if (fops_write_replace(dst, ips, size) != 0)
+		return report(INST_FAILED, msg, msg_len, "can't write the patch");
+	return report(INST_DONE, msg, msg_len, "patch installed (%u changes)", records);
+}
+
 InstResult inst_copy_patch(const char *src, const char *dst, char *msg, size_t msg_len)
 {
 	unsigned char *ips;
 	size_t size;
-	unsigned records;
-	InstResult r;
-
 	if (fops_read(src, &ips, &size, FOPS_MAX_READ) != 0)
 		return report(INST_FAILED, msg, msg_len, "can't read the bundled patch");
-	if (!ips_is_valid(ips, size, &records))
-		r = report(INST_FAILED, msg, msg_len, "bundled patch is damaged");
-	else if (fops_same_content(dst, ips, size))
-		r = report(INST_ALREADY, msg, msg_len, "patch already installed");
-	else if (fops_mkdirs_for(dst) != 0)
-		r = report(INST_FAILED, msg, msg_len, "can't create the patch folder");
-	else if (fops_write_replace(dst, ips, size) != 0)
-		r = report(INST_FAILED, msg, msg_len, "can't write the patch");
-	else
-		r = report(INST_DONE, msg, msg_len, "patch installed (%u changes)", records);
+	InstResult r = inst_write_patch(ips, size, dst, msg, msg_len);
 	free(ips);
 	return r;
 }

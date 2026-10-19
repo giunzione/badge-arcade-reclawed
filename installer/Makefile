@@ -47,9 +47,9 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	reclawed-installer
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source vendor/qrcodegen
 DATA		:=	data
-INCLUDES	:=	include
+INCLUDES	:=	include vendor/qrcodegen
 GRAPHICS	:=	gfx
 GFXBUILD	:=	$(BUILD)
 
@@ -76,7 +76,18 @@ VERSION		:=	$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_MICRO)
 # The version gets a "-fake" suffix so such a build is never mistaken for a real one.
 ifneq ($(FAKE_GAME),)
 VERSION		:=	$(VERSION)-fake
-FAKE_DEFINE	:=	-DRECLAWED_FAKE_GAME
+FAKE_DEFINE	:=	-DRECLAWED_FAKE_GAME -DRECLAWED_TEST_LOG
+endif
+# Reclawed: more test switches (never for releases), see tests/fake_release.py:
+#   FAKE_VERSION=n   with FAKE_GAME: fake update version n (0 = no update)
+#   ONLINE_BASE=url  look for releases at url instead of GitHub
+# Test builds also log every check result to sdmc:/3ds/badge-arcade-reclawed/test-log.txt.
+ifneq ($(FAKE_VERSION),)
+FAKE_DEFINE	+=	-DRECLAWED_FAKE_VERSION=$(FAKE_VERSION)
+endif
+ifneq ($(ONLINE_BASE),)
+VERSION		:=	$(VERSION)-test
+FAKE_DEFINE	+=	-DRECLAWED_ONLINE_BASE=\"$(ONLINE_BASE)\" -DRECLAWED_TEST_LOG
 endif
 
 META		:=	meta
@@ -84,8 +95,8 @@ ICON		:=	meta/icon.png
 # Reclawed: the RomFS is assembled at build time from the generated patches,
 # so it lives under build/ and is never committed.
 ROMFS		:=	$(BUILD)/romfs
-# Where tools/build_ips.py (or .github/scripts/build_all.sh) wrote the patches:
-# <PATCH_BUILD>/<REGION>/luma/titles/<title id>/code.ips
+# Where tools/make_manifest.py (or .github/scripts/build_all.sh) wrote the
+# patch manifest: <PATCH_BUILD>/patches/patches.txt + patch-*.ips
 PATCH_BUILD	?=	../build
 
 #---------------------------------------------------------------------------------
@@ -104,14 +115,15 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-# Reclawed: citro2d draws the UI on top of citro3d.
-LIBS	:= -lcitro2d -lcitro3d -lctru -lm
+# Reclawed: citro2d draws the UI on top of citro3d; curl + mbedTLS (portlibs:
+# pacman -S 3ds-curl) download the latest patches.
+LIBS	:= -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lz -lcitro2d -lcitro3d -lctru -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(CTRULIB)
+LIBDIRS	:= $(PORTLIBS) $(CTRULIB)
 
 
 #---------------------------------------------------------------------------------
@@ -215,20 +227,22 @@ all: $(BUILD) $(GFXBUILD) $(DEPSDIR) romfs $(ROMFS_T3XFILES) $(T3XHFILES)
 $(BUILD):
 	@mkdir -p $@
 
-# Reclawed: bundle every built patch as romfs:/luma/titles/<title id>/code.ips,
-# the same layout it gets on the SD card. Rebuilt on every `make` so the app
-# always carries the latest patches; the .3dsx is removed so it gets repacked
-# with the new RomFS even when no source changed.
+# Reclawed: the RomFS holds the built-in patches (the offline fallback) and the
+# CA certificates for HTTPS:
+#   romfs:/patches/patches.txt + patch-*.ips   from $(PATCH_BUILD)/patches/
+#   romfs:/certs/cacert.pem                    from certs/
+# Rebuilt on every `make` so the app always carries the latest patches; the
+# .3dsx is removed so it gets repacked with the new RomFS even when no source
+# changed.
 romfs: | $(BUILD)
-	@rm -rf $(ROMFS) $(TARGET).3dsx && mkdir -p $(ROMFS)/luma/titles
-	@found=0; \
-	for f in $(PATCH_BUILD)/*/luma/titles/*/code.ips; do \
-		[ -f "$$f" ] || continue; \
-		tid=$$(basename $$(dirname "$$f")); \
-		mkdir -p $(ROMFS)/luma/titles/$$tid && cp "$$f" $(ROMFS)/luma/titles/$$tid/ || exit 1; \
-		echo "bundling $$f"; found=1; \
-	done; \
-	[ $$found = 1 ] || { echo "No patches in $(PATCH_BUILD)/: run tools/build_ips.py first"; exit 1; }
+	@rm -rf $(ROMFS) $(TARGET).3dsx && mkdir -p $(ROMFS)/patches $(ROMFS)/certs
+	@[ -f $(PATCH_BUILD)/patches/patches.txt ] || { \
+		echo "No $(PATCH_BUILD)/patches/patches.txt: run tools/build_ips.py, then tools/make_manifest.py"; \
+		exit 1; }
+	@cp $(PATCH_BUILD)/patches/* $(ROMFS)/patches/
+	@cp certs/cacert.pem $(ROMFS)/certs/
+	@echo "bundling $$(grep -c '^[0-9A-F]' $(ROMFS)/patches/patches.txt) patch(es):" \
+		"$$(grep '^reclawed-patches' $(ROMFS)/patches/patches.txt)"
 
 ifneq ($(GFXBUILD),$(BUILD))
 $(GFXBUILD):
@@ -285,6 +299,10 @@ else
 $(OUTPUT).3dsx	:	$(OUTPUT).elf $(_3DSXDEPS)
 
 $(OFILES_SOURCES) : $(HFILES)
+
+# Reclawed: vendored code is kept unchanged; silence its one harmless warning
+# (enum range checks in asserts) for that file only.
+qrcodegen.o : CFLAGS += -Wno-type-limits
 
 $(OUTPUT).elf	:	$(OFILES)
 

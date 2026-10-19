@@ -16,11 +16,51 @@
 #include "luma_config.h"
 #include "luma_system.h"
 
-void probe_patch_paths(int index, char *bundled, char *on_sd, size_t len)
+/* The app's own patches (RomFS), loaded once. */
+static Manifest builtin;
+static bool builtin_loaded, builtin_ok;
+
+/* The patch chosen for each game by probe_resolve(). */
+static struct
 {
-	unsigned long long tid = GAME_TITLES[index].base_tid;
-	snprintf(bundled, len, BUNDLED_DIR "/%016llX/code.ips", tid);
-	snprintf(on_sd, len, SD_TITLES_DIR "/%016llX/code.ips", tid);
+	const unsigned char *data;
+	size_t size;
+	unsigned char *owned; /* built-in copy we must free; online data belongs to the job */
+} chosen[GAME_TITLE_COUNT];
+
+void probe_sd_patch_path(int index, char *out, size_t len)
+{
+	snprintf(out, len, SD_TITLES_DIR "/%016llX/code.ips",
+	         (unsigned long long)GAME_TITLES[index].base_tid);
+}
+
+const unsigned char *probe_patch_data(int index, size_t *size)
+{
+	*size = chosen[index].size;
+	return chosen[index].data;
+}
+
+void probe_free(void)
+{
+	for (int i = 0; i < GAME_TITLE_COUNT; i++)
+	{
+		free(chosen[i].owned);
+		memset(&chosen[i], 0, sizeof(chosen[i]));
+	}
+}
+
+static void load_builtin(void)
+{
+	if (builtin_loaded)
+		return;
+	builtin_loaded = true;
+	unsigned char *text;
+	size_t size;
+	if (fops_read(BUILTIN_DIR "/patches.txt", &text, &size, FOPS_MAX_READ) == 0)
+	{
+		builtin_ok = manifest_parse((const char *)text, size, &builtin) == MANIFEST_OK;
+		free(text);
+	}
 }
 
 /* Is the title installed on the SD, and with which version? */
@@ -58,44 +98,126 @@ static void probe_luma(SystemState *s)
 
 static void probe_game(SystemState *s, int i)
 {
-	unsigned base_version;
-	s->game[i].installed = title_version(GAME_TITLES[i].base_tid, &base_version);
+	s->game[i].installed = title_version(GAME_TITLES[i].base_tid, &s->game[i].base_version);
 	s->game[i].update_installed =
 		title_version(GAME_TITLES[i].update_tid, &s->game[i].update_version);
 
 #ifdef RECLAWED_FAKE_GAME
+	/* RECLAWED_FAKE_VERSION (make FAKE_VERSION=n) fakes another update version,
+	 * e.g. one no patch exists for; 0 fakes "no update installed". */
+#ifndef RECLAWED_FAKE_VERSION
+#define RECLAWED_FAKE_VERSION GAME_TITLES[i].update_version
+#endif
 	if (strcmp(GAME_TITLES[i].region, "EUR") == 0)
 	{
 		s->game[i].installed = true;
-		s->game[i].update_installed = true;
-		s->game[i].update_version = GAME_TITLES[i].update_version;
+		s->game[i].base_version = 4096;
+		s->game[i].update_installed = RECLAWED_FAKE_VERSION != 0;
+		s->game[i].update_version = RECLAWED_FAKE_VERSION;
 	}
 #endif
 
-	char bundled[96], on_sd[96];
-	probe_patch_paths(i, bundled, on_sd, sizeof(bundled));
-	unsigned char *ips;
-	size_t ips_size;
-	s->game[i].patch_bundled = fops_read(bundled, &ips, &ips_size, FOPS_MAX_READ) == 0;
-	if (!s->game[i].patch_bundled)
+	/* The update's code runs whenever the update is installed. */
+	if (s->game[i].update_installed)
 	{
-		/* Nothing to compare with, but a leftover patch can still be removed. */
-		s->game[i].sd_patch = fops_exists(on_sd) ? PATCH_DIFFERENT : PATCH_NOT_ON_SD;
-		return;
+		s->game[i].code = CODE_UPDATE;
+		s->game[i].code_version = s->game[i].update_version;
 	}
-	if (fops_same_content(on_sd, ips, ips_size))
-		s->game[i].sd_patch = PATCH_SAME;
-	else if (fops_exists(on_sd))
-		s->game[i].sd_patch = PATCH_DIFFERENT;
 	else
-		s->game[i].sd_patch = PATCH_NOT_ON_SD;
-	free(ips);
+	{
+		s->game[i].code = CODE_BASE;
+		s->game[i].code_version = s->game[i].base_version;
+	}
 }
 
 void probe_system(SystemState *s)
 {
 	memset(s, 0, sizeof(*s));
+	load_builtin();
+	if (builtin_ok)
+		snprintf(s->builtin_release, sizeof(s->builtin_release), "%s", builtin.release);
+	s->online = ONLINE_CHECKING;
 	probe_luma(s);
 	for (int i = 0; i < GAME_TITLE_COUNT; i++)
 		probe_game(s, i);
+}
+
+void probe_online_wants(const SystemState *s, OnlineJob *job)
+{
+	for (int i = 0; i < GAME_TITLE_COUNT; i++)
+	{
+		job->want[i].wanted = s->game[i].installed;
+		job->want[i].base_tid = GAME_TITLES[i].base_tid;
+		job->want[i].code = s->game[i].code;
+		job->want[i].version = s->game[i].code_version;
+	}
+}
+
+/* The built-in file for an entry, if it is there and matches its hash. */
+static unsigned char *read_builtin(const PatchEntry *e, size_t *size)
+{
+	char path[96];
+	unsigned char *data;
+	snprintf(path, sizeof(path), BUILTIN_DIR "/%s", e->file);
+	if (fops_read(path, &data, size, MANIFEST_MAX_PATCH_SIZE) != 0)
+		return NULL;
+	if (!manifest_entry_matches(e, data, *size))
+	{
+		free(data);
+		return NULL;
+	}
+	return data;
+}
+
+void probe_resolve(SystemState *s, OnlineJob *job)
+{
+	probe_free();
+	bool done = job && online_done(job);
+	if (!done)
+		s->online = ONLINE_CHECKING;
+	else if (job->manifest_ok)
+		s->online = ONLINE_OK;
+	else
+	{
+		s->online = ONLINE_FAILED;
+		s->online_error = job->status;
+	}
+
+	for (int i = 0; i < GAME_TITLE_COUNT; i++)
+	{
+		char sd_path[96];
+		probe_sd_patch_path(i, sd_path, sizeof(sd_path));
+		s->game[i].source = SOURCE_NONE;
+		s->game[i].fetch = done && job->manifest_ok ? job->got[i].result : FETCH_NOT_TRIED;
+		s->game[i].patch_release[0] = '\0';
+		s->game[i].sd_patch = fops_exists(sd_path) ? PATCH_DIFFERENT : PATCH_NOT_ON_SD;
+		if (!s->game[i].installed || !done)
+			continue;
+
+		const PatchEntry *e;
+		PatchSource src = manifest_choose(job->manifest_ok ? &job->manifest : NULL, job->got[i].ok,
+		                                  builtin_ok ? &builtin : NULL, GAME_TITLES[i].base_tid,
+		                                  s->game[i].code, s->game[i].code_version, &e);
+		if (src == SOURCE_ONLINE)
+		{
+			chosen[i].data = job->got[i].data;
+			chosen[i].size = job->got[i].size;
+			snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
+			         job->manifest.release);
+		}
+		else if (src == SOURCE_BUILTIN)
+		{
+			chosen[i].owned = read_builtin(e, &chosen[i].size);
+			chosen[i].data = chosen[i].owned;
+			if (!chosen[i].data)
+				src = SOURCE_NONE; /* damaged build: behave as if it had no patch */
+			else
+				snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
+				         builtin.release);
+		}
+		s->game[i].source = src;
+
+		if (chosen[i].data && fops_same_content(sd_path, chosen[i].data, chosen[i].size))
+			s->game[i].sd_patch = PATCH_SAME;
+	}
 }

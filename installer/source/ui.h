@@ -21,6 +21,7 @@ typedef enum
 	DIALOG_NONE,
 	DIALOG_CONFIRM_UNINSTALL,
 	DIALOG_RESULT,
+	DIALOG_REPORT,  /* QR code to a pre-filled GitHub issue (see report.h) */
 } Dialog;
 
 #define UI_RESULT_LINES 4
@@ -56,5 +57,9 @@ void ui_draw(const CheckReport *r, const Menu *m, const UiState *u, const char *
 
 /* Dialog buttons under a touch point: 1 = confirm (A), 2 = cancel (B), 0 = none. */
 int ui_dialog_button_at(const UiState *u, int x, int y);
+
+/* Encode the URL the report dialog shows as a QR code. Returns false if it
+ * doesn't fit in a QR code small enough for the screen. */
+bool ui_set_report_url(const char *url);
 
 #endif

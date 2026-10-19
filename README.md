@@ -82,11 +82,13 @@ This case was found and tested by a French 3DS fan who reached out right after t
 </p>
 
 1. Connect the console to the internet, open **FBI**, choose **Remote Install → Scan QR Code** and scan the code above. Confirm the install.
-2. Open **Reclawed Installer** from the HOME Menu. It checks your console and lists what it finds: Luma3DS, the game and its v1.3.1 update, the patch, and Luma's settings. Anything that blocks the install is shown in red.
+2. Open **Reclawed Installer** from the HOME Menu. It checks your console and lists what it finds: Luma3DS, the game and its exact version, and Luma's settings. It also looks online for the newest patch for that version; without internet it uses the one built into the app. Anything that blocks the install is shown in red.
 3. Choose **Install**. The app copies the patch to `luma/titles/<title id>/code.ips` and turns on Luma's **"Enable game patching"** (after saving a backup of `luma/config.ini`), then restarts the console.
 4. Launch Nintendo Badge Arcade.
 
-The QR code always points to the newest release. Without a camera, download `reclawed-installer.cia` from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) and install it from the SD card with FBI. The app's **Uninstall** button removes the patch again. Details are in [`installer/README.md`](installer/README.md).
+The QR code always points to the newest release. Without a camera, download `reclawed-installer.cia` from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) and install it from the SD card with FBI. The app's **Uninstall** button removes the patch again. When a new patch comes out, just open the app again and choose **Install**: there's no need to reinstall the app.
+
+If there's no patch for your version of the game yet, the app shows a **Report** button with a QR code that opens a GitHub issue already filled in with your game's details. Details are in [`installer/README.md`](installer/README.md).
 
 ### By hand
 
@@ -112,7 +114,7 @@ python3 tools/build_ips.py --set anchor_date=2018-07-20 # if your boss.sarc cove
 
 The output goes to `build/<region>/luma/titles/<title id>/code.ips` (for EUR: `build/EUR/luma/titles/0004000000153600/code.ips`). If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
 
-The installer app lives in [`installer/`](installer/) and bundles every patch built this way; see its [README](installer/README.md) for how to build it (devkitPro). Every release rebuilds it with the latest patches.
+The installer app lives in [`installer/`](installer/); see its [README](installer/README.md) for how to build it (devkitPro). [`tools/make_manifest.py`](tools/make_manifest.py) lists the built patches in `patches.txt`, which every release publishes together with the patch files: the app downloads the newest ones and also carries a built-in copy for offline use. Each TOML's `[meta] code_title` / `code_version` say which game version it fits.
 
 ---
 
@@ -143,7 +145,7 @@ The game can't find a Nintendo Network ID. You are probably on a Pretendo accoun
 Your extdata doesn't contain `boss.sarc`. The patch can't provide machine data, because that data belongs to Nintendo.
 
 **Can you add other regions?**
-Possibly. It needs the `.code` of that region's v1.3.1 update to locate the same functions. Contributions are welcome: add a `patches/<region>-v1.3.1.toml` with its own `[meta] region` and `title_id`, and CI will build it and ship it as a separate zip.
+Possibly. It needs the `.code` of that region's v1.3.1 update to locate the same functions. Contributions are welcome: add a `patches/<region>-v1.3.1.toml` with its own `[meta] region`, `title_id`, `code_title` and `code_version`, and CI will build it, ship it as a separate zip and offer it to the installer app.
 
 **I won a badge but it's not in the HOME Menu badge box.**
 Open the badge book in the game once, then check the badge box again. If you close the game first, the badges are added the next time you launch it.

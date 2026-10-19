@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Build every patches/*.toml and package one zip per region.
-# Usage: .github/scripts/build_all.sh [suffix]   -> dist/badge-arcade-reclawed-<REGION>[-suffix].zip
+# Build every patches/*.toml and package one zip per region, plus the patch
+# manifest the installer app reads (patches.txt + patch-<REGION>-<code>.ips).
+# Usage: .github/scripts/build_all.sh [release]
+#   -> dist/badge-arcade-reclawed-<REGION>[-release].zip, dist/patches.txt, dist/patch-*.ips
+#      (build/patches/ holds the same manifest files, for the installer build)
 set -euo pipefail
 suffix="${1:+-$1}"
 rm -rf build dist && mkdir -p dist
@@ -20,5 +23,8 @@ for f in "${tomls[@]}"; do
   echo "::endgroup::"
   (cd "build/$region" && zip -qr "../../dist/badge-arcade-reclawed-${region}${suffix}.zip" luma)
 done
+
+python tools/make_manifest.py --release "${1:-dev}"
+cp build/patches/* dist/
 
 ls -l dist

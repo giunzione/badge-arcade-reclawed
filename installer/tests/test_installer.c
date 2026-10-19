@@ -46,6 +46,11 @@ static void copy_patch(void)
 	const char *bad = tmp_path(2, "inst/romfs/bad.ips");
 	CHECK(write_bytes(bad, "PATCHjunk", 9) == 0);
 	CHECK(inst_copy_patch(bad, dst, msg, sizeof(msg)) == INST_FAILED);
+	CHECK_STR(msg, "patch file is damaged");
+	CHECK(inst_write_patch(NULL, 0, dst, msg, sizeof(msg)) == INST_FAILED);
+	CHECK(inst_write_patch(IPS_B, sizeof(IPS_B) - 1, dst, msg, sizeof(msg)) == INST_DONE);
+	CHECK(fops_same_content(dst, IPS_B, sizeof(IPS_B) - 1));
+	CHECK(inst_write_patch(IPS_A, sizeof(IPS_A) - 1, dst, msg, sizeof(msg)) == INST_DONE);
 	CHECK(fops_same_content(dst, IPS_A, sizeof(IPS_A) - 1));
 	CHECK(inst_copy_patch(tmp_path(2, "inst/romfs/none.ips"), dst, msg, sizeof(msg)) == INST_FAILED);
 

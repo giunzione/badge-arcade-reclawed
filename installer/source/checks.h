@@ -11,14 +11,23 @@
 #include <stdbool.h>
 
 #include "luma_config.h"
+#include "manifest.h"
+#include "net.h"
 #include "titles.h"
 
 typedef enum
 {
 	PATCH_NOT_ON_SD, /* no code.ips for this title on the SD */
-	PATCH_SAME,      /* the SD holds exactly the bundled patch */
-	PATCH_DIFFERENT, /* the SD holds some other code.ips */
+	PATCH_SAME,      /* the SD holds exactly the chosen patch */
+	PATCH_DIFFERENT, /* the SD holds some other code.ips (e.g. an older one) */
 } PatchState;
+
+typedef enum
+{
+	ONLINE_CHECKING, /* the download thread is still running */
+	ONLINE_OK,       /* the latest release's manifest was read */
+	ONLINE_FAILED,   /* no manifest: offline, GitHub down, ... (see online_error) */
+} OnlineState;
 
 /* What the probe found on the console. */
 typedef struct
@@ -34,14 +43,28 @@ typedef struct
 	LumaCfgStatus config_status;
 	int config_game_patching; /* 0/1 when config_status is LUMACFG_OK */
 
+	/* Where patches come from */
+	OnlineState online;
+	NetStatus online_error;   /* when ONLINE_FAILED */
+	char builtin_release[32]; /* release the app's own patches come from ("" if none) */
+
 	/* One entry per GAME_TITLES row */
 	struct
 	{
-		bool installed;          /* base title on the SD */
+		bool installed;           /* base title on the SD */
 		bool update_installed;
+		unsigned base_version;
 		unsigned update_version;
-		bool patch_bundled;      /* a code.ips for it is in the app */
-		PatchState sd_patch;     /* PATCH_DIFFERENT when not bundled but a code.ips is there */
+		/* The code that runs, and so the one a patch must fit: the update's
+		 * if it is installed, else the base game's. */
+		char code;                /* CODE_UPDATE / CODE_BASE */
+		unsigned code_version;
+		/* What happened to the latest release's copy (online only) */
+		FetchResult fetch;
+		/* The patch picked for that code (manifest_choose()) */
+		PatchSource source;
+		char patch_release[32];
+		PatchState sd_patch;      /* vs the chosen patch; DIFFERENT if none chosen but a file is there */
 	} game[GAME_TITLE_COUNT];
 } SystemState;
 
@@ -66,9 +89,11 @@ typedef struct
 {
 	CheckItem items[CHECK_MAX_ITEMS];
 	int count;
-	int target;          /* GAME_TITLES index to install for, or -1 */
-	bool can_install;    /* no CHECK_STOP and a target was found */
-	bool nothing_to_do;  /* patch already there and game patching already on */
+	int target;           /* GAME_TITLES index to install for, or -1 */
+	bool can_install;     /* no CHECK_STOP, a target with a patch, online check over */
+	bool nothing_to_do;   /* patch already there and game patching already on */
+	bool checking;        /* waiting for the online check */
+	int report_target;    /* installed game with no patch for its version, or -1 */
 	int uninstall_target; /* GAME_TITLES index whose code.ips is on the SD, or -1 */
 } CheckReport;
 
