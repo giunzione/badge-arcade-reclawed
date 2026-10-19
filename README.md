@@ -51,6 +51,7 @@ This case was found and tested by a French 3DS fan who reached out right after t
 
 ### Planned
 
+- **One-step installer app.** A small app you install with FBI (scan a QR code, no PC needed) that checks your game and SpotPass data, copies the patch to the right place and turns on Luma's *Enable game patching* for you if it's off. No more taking out the SD card. It will also be available on Universal-Updater.
 - **Badges in the HOME Menu right away.** Today they appear in the badge box after you open the badge book once, or at the next launch. The export is already triggered at the end of each session; it only needs to run without waiting for the badge book.
 - **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
 - **Faster loading**, if possible. Some of the wait at boot may come from steps meant for the online service. To be investigated, no promises.
