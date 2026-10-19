@@ -41,7 +41,7 @@ typedef struct
 		bool update_installed;
 		unsigned update_version;
 		bool patch_bundled;      /* a code.ips for it is in the app */
-		PatchState sd_patch;     /* only meaningful when patch_bundled */
+		PatchState sd_patch;     /* PATCH_DIFFERENT when not bundled but a code.ips is there */
 	} game[GAME_TITLE_COUNT];
 } SystemState;
 
@@ -69,6 +69,7 @@ typedef struct
 	int target;          /* GAME_TITLES index to install for, or -1 */
 	bool can_install;    /* no CHECK_STOP and a target was found */
 	bool nothing_to_do;  /* patch already there and game patching already on */
+	int uninstall_target; /* GAME_TITLES index whose code.ips is on the SD, or -1 */
 } CheckReport;
 
 void checks_run(const SystemState *s, CheckReport *out);

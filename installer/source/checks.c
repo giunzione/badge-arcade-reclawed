@@ -131,4 +131,14 @@ void checks_run(const SystemState *s, CheckReport *out)
 	if (t < 0)
 		out->can_install = false;
 	out->nothing_to_do = out->can_install && !patch_needed && !config_needed;
+
+	/* Uninstall: the target's patch if it has one on the SD, else any Badge
+	 * Arcade patch left there (e.g. the game was deleted). Not blocked by the
+	 * checks above: removing the file is always safe. */
+	out->uninstall_target = -1;
+	if (t >= 0 && s->game[t].sd_patch != PATCH_NOT_ON_SD)
+		out->uninstall_target = t;
+	for (int i = 0; i < GAME_TITLE_COUNT && out->uninstall_target < 0; i++)
+		if (s->game[i].sd_patch != PATCH_NOT_ON_SD)
+			out->uninstall_target = i;
 }

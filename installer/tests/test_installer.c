@@ -105,9 +105,22 @@ static void refuses_unknown_configs(void)
 	free(big);
 }
 
+static void remove_patch(void)
+{
+	char msg[96];
+	const char *p = tmp_path(0, "inst/sd3/luma/titles/0004000000153600/code.ips");
+	CHECK(write_bytes(p, IPS_A, sizeof(IPS_A) - 1) == 0);
+	CHECK(inst_remove_patch(p, msg, sizeof(msg)) == INST_DONE);
+	CHECK_STR(msg, "patch removed");
+	CHECK(!fops_exists(p));
+	CHECK(inst_remove_patch(p, msg, sizeof(msg)) == INST_ALREADY);
+	CHECK_STR(msg, "no patch installed");
+}
+
 void test_installer(void)
 {
 	copy_patch();
+	remove_patch();
 	enable_game_patching();
 	refuses_unknown_configs();
 }

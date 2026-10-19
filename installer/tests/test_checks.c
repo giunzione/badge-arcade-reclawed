@@ -198,6 +198,34 @@ static void lines_fit_the_screen(void)
 	}
 }
 
+static void uninstall_target(void)
+{
+	SystemState s = ready();
+	CheckReport r;
+	checks_run(&s, &r);
+	CHECK(r.uninstall_target == -1); /* nothing on the SD */
+
+	s.game[EUR].sd_patch = PATCH_SAME;
+	checks_run(&s, &r);
+	CHECK(r.uninstall_target == EUR);
+
+	/* Game deleted but its patch left behind: removable, though not installable. */
+	s.game[EUR].installed = false;
+	checks_run(&s, &r);
+	CHECK(!r.can_install && r.uninstall_target == EUR);
+
+	/* A leftover patch for a region without a bundled one. */
+	s = ready();
+	s.game[USA].sd_patch = PATCH_DIFFERENT;
+	checks_run(&s, &r);
+	CHECK(r.target == EUR && r.uninstall_target == USA);
+
+	/* The detected game's patch comes first. */
+	s.game[EUR].sd_patch = PATCH_DIFFERENT;
+	checks_run(&s, &r);
+	CHECK(r.uninstall_target == EUR);
+}
+
 static void titles_lookup(void)
 {
 	CHECK(titles_find("0004000000153600") == EUR);
@@ -221,5 +249,6 @@ void test_checks_run(void)
 	luma_states();
 	config_problems();
 	lines_fit_the_screen();
+	uninstall_target();
 	titles_lookup();
 }

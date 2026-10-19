@@ -50,6 +50,15 @@ InstResult inst_copy_patch(const char *src, const char *dst, char *msg, size_t m
 	return r;
 }
 
+InstResult inst_remove_patch(const char *path, char *msg, size_t msg_len)
+{
+	if (!fops_exists(path))
+		return report(INST_ALREADY, msg, msg_len, "no patch installed");
+	if (remove(path) != 0 || fops_exists(path))
+		return report(INST_FAILED, msg, msg_len, "can't delete the patch");
+	return report(INST_DONE, msg, msg_len, "patch removed");
+}
+
 InstResult inst_enable_game_patching(const char *cfg_path, const char *backup_path,
                                      char *msg, size_t msg_len)
 {

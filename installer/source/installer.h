@@ -21,6 +21,11 @@ typedef enum
  * checked to be a valid IPS first, and the copy is read back. */
 InstResult inst_copy_patch(const char *src, const char *dst, char *msg, size_t msg_len);
 
+/* Delete the installed patch at `path` (uninstall). Game patching is left on:
+ * other mods may rely on it, and without a code.ips it changes nothing for
+ * Badge Arcade. */
+InstResult inst_remove_patch(const char *path, char *msg, size_t msg_len);
+
 /* Set enable_game_patching = 1 in the Luma3DS config.ini at `cfg_path`.
  * Before the edit the current file is copied to `backup_path`. Only the one
  * value character is rewritten in place, then the file is parsed again. */

@@ -78,7 +78,11 @@ static void probe_game(SystemState *s, int i)
 	size_t ips_size;
 	s->game[i].patch_bundled = fops_read(bundled, &ips, &ips_size, FOPS_MAX_READ) == 0;
 	if (!s->game[i].patch_bundled)
+	{
+		/* Nothing to compare with, but a leftover patch can still be removed. */
+		s->game[i].sd_patch = fops_exists(on_sd) ? PATCH_DIFFERENT : PATCH_NOT_ON_SD;
 		return;
+	}
 	if (fops_same_content(on_sd, ips, ips_size))
 		s->game[i].sd_patch = PATCH_SAME;
 	else if (fops_exists(on_sd))

@@ -1,155 +1,226 @@
 /*
- * Badge Arcade Reclawed installer - entry point and text UI.
+ * Badge Arcade Reclawed installer - entry point, input and actions.
  *
- * Top screen: the result of every check (checks.c) on the current state of
- * the console (probe.c). Bottom screen: controls, then the install report.
- * Pressing A, when the checks allow it, installs for the detected game:
- *   1. copy romfs:/luma/titles/<title id>/code.ips to the same path on the SD;
- *   2. set enable_game_patching = 1 in sdmc:/luma/config.ini.
+ * Every frame: read the buttons and the touch screen, act on them, draw
+ * (ui.c). The state of the console is probed at start and again after every
+ * action (probe.c -> checks.c), so the screens always show what is on the SD.
+ *
+ * Actions:
+ *   Install   copy the patch for the detected game, enable game patching,
+ *             then restart after a 3-second countdown if the toggle is on
+ *   Uninstall delete the patch from the SD (after a confirmation)
+ *   Restart   restart the console, so Luma applies the new settings
+ *   Exit      back to the HOME Menu / Homebrew Launcher (also START)
  */
 #include <stdio.h>
 #include <3ds.h>
 
 #include "checks.h"
 #include "installer.h"
+#include "menu.h"
 #include "probe.h"
+#include "ui.h"
 
 #ifndef APP_VERSION
 #define APP_VERSION "dev" /* normally set by the Makefile from VERSION */
 #endif
 
-/* ANSI colors understood by the libctru console. */
-#define C_RESET  "\x1b[0m"
-#define C_GREEN  "\x1b[32;1m"
-#define C_RED    "\x1b[31;1m"
-#define C_YELLOW "\x1b[33;1m"
-#define C_CYAN   "\x1b[36;1m"
+#define COUNTDOWN_FRAMES (3 * 60)
 
-static PrintConsole top, bottom;
+static CheckReport report;
+static Menu menu;
+static UiState ui;
 
-static void draw_checks(const CheckReport *r)
-{
-	static const char *const tags[] = {
-		[CHECK_OK] = C_GREEN "[ ok ]" C_RESET,
-		[CHECK_INFO] = C_CYAN "[info]" C_RESET,
-		[CHECK_WARN] = C_YELLOW "[warn]" C_RESET,
-		[CHECK_STOP] = C_RED "[STOP]" C_RESET,
-	};
-
-	consoleSelect(&top);
-	consoleClear();
-	printf("Badge Arcade Reclawed installer v%s\n\n", APP_VERSION);
-	for (int i = 0; i < r->count; i++)
-		printf("%s %s\n", tags[r->items[i].level], r->items[i].text);
-
-	printf("\n");
-	if (r->nothing_to_do)
-		printf(C_GREEN "Everything is installed." C_RESET "\n");
-	else if (r->can_install)
-		printf("Ready to install.\n");
-	else
-		printf(C_RED "Can't install: see the [STOP] lines." C_RESET "\n");
-}
-
-static void draw_controls(const CheckReport *r)
-{
-	if (r->can_install && !r->nothing_to_do)
-		printf("\n(A) install    (START) exit\n");
-	else
-		printf("\n(START) exit\n");
-}
-
-static void print_result(const char *what, InstResult res, const char *msg)
-{
-	const char *tag = res == INST_DONE    ? C_GREEN "[done]" C_RESET
-	                : res == INST_ALREADY ? C_GREEN "[ ok ]" C_RESET
-	                                      : C_RED "[fail]" C_RESET;
-	printf("%s %s:\n       %s\n", tag, what, msg);
-}
-
-/* Bottom screen: run both install steps for the target game and report. */
-static void run_install(const CheckReport *r)
-{
-	consoleSelect(&bottom);
-	consoleClear();
-
-	char bundled[96], on_sd[96], msg[96];
-	probe_patch_paths(r->target, bundled, on_sd, sizeof(bundled));
-
-	InstResult patch = inst_copy_patch(bundled, on_sd, msg, sizeof(msg));
-	print_result("Patch", patch, msg);
-	if (patch == INST_FAILED)
-	{
-		printf("\n" C_RED "Install stopped." C_RESET "\n");
-		return;
-	}
-
-	InstResult cfg = inst_enable_game_patching(LUMA_CONFIG, CONFIG_BACKUP, msg, sizeof(msg));
-	print_result("Luma3DS config", cfg, msg);
-	if (cfg == INST_FAILED)
-	{
-		printf("\n" C_RED "Install incomplete." C_RESET "\n");
-		return;
-	}
-
-	printf("\n" C_GREEN "Done." C_RESET " Restart the console to\n"
-	       "apply. Don't save Rosalina settings\n"
-	       "before restarting: that would turn\n"
-	       "game patching off again.\n");
-}
-
-/* Probe the console, run the checks and redraw the top screen. */
-static void refresh(CheckReport *r)
+/* Probe the console again and update what the menu allows. */
+static void refresh(void)
 {
 	SystemState state;
 	probe_system(&state);
-	checks_run(&state, r);
-	draw_checks(r);
+	checks_run(&state, &report);
+	menu_update(&menu, &report, true);
+}
+
+static void add_line(const char *label, InstResult r, const char *msg)
+{
+	if (ui.line_count >= UI_RESULT_LINES)
+		return;
+	UiLine *l = &ui.lines[ui.line_count++];
+	l->level = r == INST_FAILED ? CHECK_STOP : CHECK_OK;
+	snprintf(l->label, sizeof(l->label), "%s", label);
+	snprintf(l->text, sizeof(l->text), "%s", msg);
+}
+
+static void open_result(const char *title, bool failed)
+{
+	ui.dialog = DIALOG_RESULT;
+	snprintf(ui.title, sizeof(ui.title), "%s", title);
+	ui.failed = failed;
+	ui.countdown_frames = 0;
+	ui.restart_failed = false;
+}
+
+/* Ask the system to restart. Luma3DS reads config.ini and code.ips again at
+ * boot, so this is what makes the install take effect. */
+static bool restart_console(void)
+{
+	if (R_SUCCEEDED(APT_HardwareResetAsync()))
+		return true;
+	/* Fallback: the power manager (ptm:sysm, allowed in meta/app.rsf). */
+	if (R_SUCCEEDED(ptmSysmInit()))
+	{
+		Result r = PTMSYSM_RebootAsync(0);
+		ptmSysmExit();
+		return R_SUCCEEDED(r);
+	}
+	return false;
+}
+
+static void do_install(void)
+{
+	char bundled[96], on_sd[96], msg[96];
+	ui.line_count = 0;
+	probe_patch_paths(report.target, bundled, on_sd, sizeof(bundled));
+
+	InstResult patch = inst_copy_patch(bundled, on_sd, msg, sizeof(msg));
+	add_line("Patch", patch, msg);
+	InstResult cfg = INST_FAILED;
+	if (patch != INST_FAILED)
+	{
+		cfg = inst_enable_game_patching(LUMA_CONFIG, CONFIG_BACKUP, msg, sizeof(msg));
+		add_line("Luma3DS config", cfg, msg);
+	}
+
+	bool ok = patch != INST_FAILED && cfg != INST_FAILED;
+	open_result(ok ? "Installed" : "Install failed", !ok);
+	if (ok && menu.restart_after_install)
+		ui.countdown_frames = COUNTDOWN_FRAMES;
+	refresh();
+}
+
+static void do_uninstall(void)
+{
+	char bundled[96], on_sd[96], msg[96];
+	ui.line_count = 0;
+	probe_patch_paths(report.uninstall_target, bundled, on_sd, sizeof(bundled));
+	InstResult r = inst_remove_patch(on_sd, msg, sizeof(msg));
+	add_line("Patch", r, msg);
+	open_result(r == INST_FAILED ? "Uninstall failed" : "Uninstalled", r == INST_FAILED);
+	refresh();
+}
+
+static void do_restart(void)
+{
+	if (restart_console())
+		return; /* the system closes the app; aptMainLoop() will return false */
+	if (ui.dialog == DIALOG_NONE)
+	{
+		ui.line_count = 0;
+		open_result("Restart", true);
+	}
+	ui.countdown_frames = 0;
+	ui.restart_failed = true;
+}
+
+/* Run the menu item; returns false to quit the app. */
+static bool activate(MenuItem item)
+{
+	if (item == ITEM_NONE || !menu.enabled[item])
+		return true;
+	menu.selected = item;
+	switch (item)
+	{
+	case ITEM_INSTALL: do_install(); break;
+	case ITEM_UNINSTALL: ui.dialog = DIALOG_CONFIRM_UNINSTALL; break;
+	case ITEM_RESTART: do_restart(); break;
+	case ITEM_EXIT: return false;
+	case ITEM_RESTART_AFTER: menu.restart_after_install = !menu.restart_after_install; break;
+	default: break;
+	}
+	return true;
+}
+
+/* Input while a dialog is open. `button` comes from a touch: 1 = A, 2 = B. */
+static void dialog_input(u32 down, int button)
+{
+	bool yes = (down & KEY_A) || button == 1;
+	bool no = (down & KEY_B) || button == 2;
+
+	if (ui.dialog == DIALOG_CONFIRM_UNINSTALL)
+	{
+		if (yes)
+			do_uninstall();
+		else if (no)
+			ui.dialog = DIALOG_NONE;
+		return;
+	}
+
+	/* Result dialog, maybe with the restart countdown running. */
+	if (ui.countdown_frames > 0)
+	{
+		if (yes)
+			do_restart();
+		else if (no)
+			ui.countdown_frames = 0;
+		else if (--ui.countdown_frames == 0)
+			do_restart();
+		return;
+	}
+	if (yes || no)
+		ui.dialog = DIALOG_NONE;
 }
 
 int main(void)
 {
-	gfxInitDefault();
-	consoleInit(GFX_TOP, &top);
-	consoleInit(GFX_BOTTOM, &bottom);
+	romfsInit(); /* the bundled patches; probe reports them missing if this fails */
+	amInit();    /* installed titles; without it the game shows as not installed */
+	if (!ui_init())
+	{
+		ui_exit();
+		return 1;
+	}
 
-	/* RomFS holds the patches; am lists the installed titles. */
-	bool romfs_ok = R_SUCCEEDED(romfsInit());
-	bool am_ok = R_SUCCEEDED(amInit());
-
-	CheckReport report;
-	refresh(&report);
-
-	consoleSelect(&bottom);
-	if (!romfs_ok)
-		printf(C_RED "Can't open the app's RomFS." C_RESET "\n");
-	if (!am_ok)
-		printf(C_RED "Can't list installed titles (am)." C_RESET "\n");
-	draw_controls(&report);
+	menu_init(&menu);
+	refresh();
 
 	while (aptMainLoop())
 	{
 		hidScanInput();
 		u32 down = hidKeysDown();
-		if (down & KEY_START)
-			break;
-		if ((down & KEY_A) && report.can_install && !report.nothing_to_do)
+
+		/* A tap: the item or dialog button under the stylus. */
+		MenuItem tapped = ITEM_NONE;
+		int dlg_button = 0;
+		if (down & KEY_TOUCH)
 		{
-			run_install(&report);
-			refresh(&report); /* show the new state */
-			consoleSelect(&bottom);
-			draw_controls(&report);
+			touchPosition t;
+			hidTouchRead(&t);
+			if (ui.dialog != DIALOG_NONE)
+				dlg_button = ui_dialog_button_at(&ui, t.px, t.py);
+			else
+				tapped = menu_item_at(t.px, t.py);
 		}
 
-		gfxFlushBuffers();
-		gfxSwapBuffers();
-		gspWaitForVBlank();
+		if (ui.dialog != DIALOG_NONE)
+			dialog_input(down, dlg_button);
+		else
+		{
+			if (down & KEY_START)
+				break;
+			if (down & KEY_DLEFT) menu_move(&menu, -1, 0);
+			if (down & KEY_DRIGHT) menu_move(&menu, 1, 0);
+			if (down & KEY_DUP) menu_move(&menu, 0, -1);
+			if (down & KEY_DDOWN) menu_move(&menu, 0, 1);
+			if ((down & KEY_A) && !activate(menu.selected))
+				break;
+			if (tapped != ITEM_NONE && !activate(tapped))
+				break;
+		}
+
+		ui_draw(&report, &menu, &ui, APP_VERSION);
 	}
 
-	if (am_ok)
-		amExit();
-	if (romfs_ok)
-		romfsExit();
-	gfxExit();
+	ui_exit();
+	amExit();
+	romfsExit();
 	return 0;
 }

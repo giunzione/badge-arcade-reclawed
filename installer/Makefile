@@ -67,7 +67,7 @@ APP_UNIQUE_ID	:=	0xBADA0
 # always leaves minor at 0, so FBI shows 0.1.0 as "0.0.0". The on-screen
 # version is the reliable one.
 VERSION_MAJOR	:=	0
-VERSION_MINOR	:=	3
+VERSION_MINOR	:=	4
 VERSION_MICRO	:=	0
 VERSION		:=	$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_MICRO)
 
@@ -104,7 +104,8 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lctru -lm
+# Reclawed: citro2d draws the UI on top of citro3d.
+LIBS	:= -lcitro2d -lcitro3d -lctru -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

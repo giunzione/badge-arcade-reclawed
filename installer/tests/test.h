@@ -32,6 +32,7 @@ void test_ips(void);
 void test_fileops(void);
 void test_installer(void);
 void test_checks_run(void);
+void test_menu(void);
 
 /* Build "<test_tmp><name>" into a static buffer (one at a time per slot). */
 const char *tmp_path(int slot, const char *name);
