@@ -38,8 +38,7 @@ jobs:
       - name: Variable override smoke test
         run: |
           for f in patches/*.toml; do
-            python tools/build_ips.py --patch "$f" --set plays=99 --set catalog_mode=1 \
-              --set anchor_date=2019-01-10 --out "/tmp/smoke/$(basename "$f" .toml).ips"
+            python tools/build_ips.py --patch "$f" --set plays=99 --out "/tmp/smoke/$(basename "$f" .toml).ips"
           done
 
       - name: Validate IPS structure
@@ -58,8 +57,11 @@ jobs:
                   i += 5 + size
                   n += 1
               assert i == len(d) - 3, f"{p}: trailing data"
-              # One settings block (anchor + catalog mode), rewritten by the installer.
+              # One settings block, written per console by the installer. As
+              # built: no anchor, built-in machines (works on any console).
               assert d.count(b"RCLWCFG1") == 1, f"{p}: expected exactly one settings block"
+              at = d.index(b"RCLWCFG1") + 8
+              assert d[at:at + 12] == bytes(8) + (1).to_bytes(4, "little"), f"{p}: settings block not at its default"
               print(f"{p}: OK, {n} records, {len(d)} bytes")
           PY
 

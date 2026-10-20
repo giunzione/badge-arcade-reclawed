@@ -118,7 +118,7 @@ If there's no patch for your version of the game yet, the app shows a **Report**
 
 To uninstall, delete `code.ips`. The installed game is never modified.
 
-A patch installed by hand uses its default SpotPass week: **2018-07-13** for EUR, **2019-01-10** for USA. If your `boss.sarc` holds another week, or you have none, use the installer app. It reads your week and sets the patch up for it. Or [build the patch](#building-from-source) with `--set anchor_date=…` / `--set catalog_mode=1`.
+A patch installed by hand always plays the game's **built-in machines** (the same 30 every day): only the installer app can read which SpotPass week your `boss.sarc` holds. For the SpotPass machines, install with the app, or run it once after copying the zip. It shows *Patch settings will change* and sets the patch up for your week.
 
 > [!TIP]
 > The game takes **a long time to load**, especially on *Reading latest data...* after the title screen. On an Old 3DS with a slow SD card this can take about two minutes. Don't panic: it isn't frozen. The game reads its SpotPass badge data in many small pieces at every boot; that's the original game's behaviour, not the patch's.
@@ -131,11 +131,9 @@ Each patch is defined as data in [`patches/`](patches/), one TOML per game versi
 pip install -r requirements.txt
 python3 tools/build_ips.py                              # defaults from the TOML [vars]
 python3 tools/build_ips.py --set plays=25               # override a variable
-python3 tools/build_ips.py --set anchor_date=2018-07-20 # if your boss.sarc covers another week
-python3 tools/build_ips.py --set catalog_mode=1         # the game's built-in machines, no boss.sarc needed
 ```
 
-`anchor_date` and `catalog_mode` are only the defaults of the patch's settings block: the installer app rewrites that block for each console ([04 – Time](docs/04-time.md#which-week-set-per-console)).
+There is no date to set: each patch carries a small settings block that the installer app fills in for each console with the first day of its SpotPass week. As built, the block selects the built-in machines ([04 – Time](docs/04-time.md#which-week-set-per-console)).
 
 The output goes to `build/<region>/luma/titles/<title id>/code.ips` (for EUR: `build/EUR/luma/titles/0004000000153600/code.ips`). If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
 
@@ -167,7 +165,7 @@ Limitations: quantities reset to 1, and HOME Menu shortcut badges become normal 
 The game can't find a Nintendo Network ID. You are probably on a Pretendo account: switch back to Nintendo with Nimbus.
 
 **The hall is empty or has no machines.**
-The patch was set up for another SpotPass week than the one in your `boss.sarc` (e.g. installed by hand). Run the installer app: it reads your week and fixes the patch, and shows **Patch settings will change**.
+The patch was made for another SpotPass week than the one in your `boss.sarc`. Patches up to v0.4 had a fixed week. Run the installer app: it reads your week and installs a patch set up for it.
 
 **The game stops with an SD card error before the title screen.**
 Your extdata has no `boss.sarc`. Run the installer app: it switches the patch to the game's built-in machines. The patch can't bring back the SpotPass machines, because that data belongs to Nintendo.

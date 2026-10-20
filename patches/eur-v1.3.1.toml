@@ -26,11 +26,7 @@ code_title   = "update"       # 0004000E00153600
 code_version = 5136           # v1.3.1
 
 [vars]
-plays        = 10           # free plays per crane visit (1-255)
-anchor_date  = 2018-07-13   # default first day of the SpotPass week (boss.sarc Schedule.xml,
-                            # PrizeCollection <DateStartText>); the installer sets the real one
-catalog_mode = 0            # default machines: 0 = SpotPass week (boss.sarc), 1 = built-in
-                            # catalog (the game's RomFS); the installer sets the real one
+plays       = 10           # free plays per crane visit (1-255)
 
 # ---------------------------------------------------------------------------
 # Title screen: boot without the network
@@ -154,8 +150,10 @@ description = "Jump to the HOME badge box (Y in the badge book): reload the HOME
 #
 # One patch for every console: the installer finds this block by its magic
 # ("RCLW" "CFG1") and writes the values for the console it installs on, before
-# saving code.ips (installer/source/ipscfg.h). The values below are only the
-# defaults, used when the patch is installed by hand.
+# saving code.ips (installer/source/ipscfg.h). As built, the block holds no
+# date and selects the built-in machines: the only setting that works on any
+# console. The installer switches it to the console's SpotPass week whenever
+# boss.sarc is usable.
 #   +0x00  "RCLW" "CFG1"   magic and format
 #   +0x08  anchor          first day of the SpotPass week, ms since 2000-01-01 (u64)
 #   +0x10  catalog mode    0 = SpotPass week (boss.sarc), 1 = built-in catalog
@@ -168,11 +166,11 @@ require_empty = true
 asm         = """
     .word 0x574c4352          @ "RCLW"
     .word 0x31474643          @ "CFG1"
-    .word ${anchor_ms_lo}
-    .word ${anchor_ms_hi}
-    .word ${catalog_mode}
+    .word 0                   @ anchor, low word  } set by the installer
+    .word 0                   @ anchor, high word }
+    .word 1                   @ catalog mode: built-in until the installer sets it
 """
-description = "Settings block: anchor ${anchor_date}, catalog mode ${catalog_mode} (defaults; the installer rewrites them)"
+description = "Settings block: no anchor, built-in machines (the installer writes the console's values)"
 
 # ---------------------------------------------------------------------------
 # Catalog mode 1: play the built-in machines, ignore boss.sarc

@@ -9,14 +9,13 @@ Usage:
     python3 tools/build_ips.py                                  # patches/eur-v1.3.1.toml -> build/EUR/...
                                                                 # (game without update: build/<REGION>-noupdate/...)
     python3 tools/build_ips.py --set plays=25                   # override a [vars] value
-    python3 tools/build_ips.py --set anchor_date=2018-07-20
-    python3 tools/build_ips.py --set catalog_mode=1             # built-in machines instead of boss.sarc
     python3 tools/build_ips.py --check code.bin                 # verify against YOUR decompressed .code
     python3 tools/build_ips.py --patch patches/other.toml --out somewhere/code.ips
 
-anchor_date and catalog_mode only set the defaults of the patch's settings
-block: the installer app rewrites that block for each console (see
-installer/source/ipscfg.h).
+The SpotPass week and the machines (SpotPass week / built-in) are not build
+options: the patch's settings block is written for each console by the
+installer app (installer/source/ipscfg.h). As built it selects the built-in
+machines, which work on any console.
 
 Patch entries:
     address        where the bytes go (virtual address in the .code)
@@ -29,7 +28,6 @@ Patch entries:
 Requires Python 3.11+ (tomllib) and keystone-engine (see requirements.txt).
 """
 import argparse
-import datetime
 import hashlib
 import os
 import string
@@ -48,37 +46,22 @@ from patch_meta import build_name    # tools/patch_meta.py: build/<name>/ folder
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATCH = os.path.join(ROOT, 'patches', 'eur-v1.3.1.toml')
-EPOCH = datetime.date(2000, 1, 1)        # 3DS DateTime: ms since 2000-01-01
-WEEK_MS = 7 * 24 * 60 * 60 * 1000
+WEEK_MS = 7 * 24 * 60 * 60 * 1000       # the clock remap folds time into one week
 
 
 def parse_value(raw):
-    """Turn a --set string into int / date / str."""
+    """Turn a --set string into int / str."""
     try:
         return int(raw, 0)
-    except ValueError:
-        pass
-    try:
-        return datetime.date.fromisoformat(raw)
     except ValueError:
         return raw
 
 
 def resolve_vars(vars_):
-    """Add derived variables used by the asm (anchor in ms, week length)."""
+    """Check the [vars] values and add derived ones used by the asm (week length)."""
     v = dict(vars_)
     if 'plays' in v and not (isinstance(v['plays'], int) and 1 <= v['plays'] <= 255):
         sys.exit('plays must be an integer between 1 and 255')
-    if 'anchor_date' in v:
-        d = v['anchor_date']
-        if isinstance(d, datetime.datetime):
-            d = d.date()
-        if not isinstance(d, datetime.date):
-            sys.exit('anchor_date must be a date (YYYY-MM-DD)')
-        ms = (d - EPOCH).days * 86_400_000
-        v.update(anchor_date=d.isoformat(), anchor_ms_lo=ms & 0xFFFFFFFF, anchor_ms_hi=ms >> 32)
-    if 'catalog_mode' in v and v['catalog_mode'] not in (0, 1):
-        sys.exit('catalog_mode must be 0 (SpotPass week, boss.sarc) or 1 (built-in machines)')
     v['week_ms'] = WEEK_MS
     return {k: str(x) for k, x in v.items()}
 

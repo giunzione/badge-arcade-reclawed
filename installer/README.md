@@ -73,7 +73,8 @@ patches into `patches.txt`.
 The patch folds the console's clock into one week of SpotPass data, so it has to know which
 week the console has. Every patch carries a 20-byte **settings block** (magic `RCLW` `CFG1`,
 the week's first day, the catalog mode; `source/ipscfg.h`). The app fills it in before
-writing `code.ips`. The values in the release file are only defaults.
+writing `code.ips`. As built (and in the release zips) the block has no date and selects the
+built-in machines, the one setting that works on any console.
 
 1. It opens the game's SD extdata (`extdata_id` in `source/titles.c`) and reads `boss.sarc`'s
    header and its `Schedule.xml` (`source/spotpass.c`). The whole 25 MB archive is never read.
@@ -114,8 +115,10 @@ install now (the latest release's, or its built-in one when offline):
 
 Opening the app is enough to see whether a newer patch exists. Release tags compare as
 numbers (`v0.10.0` > `v0.9.0`); a pre-release (`v0.5.0-beta`) counts as older than the same
-version without a suffix. Patches copied by hand from a release zip show as up to date when
-they match the current release, and as unknown otherwise.
+version without a suffix. A patch copied by hand from the current release zip shows as up to
+date when there's no usable `boss.sarc`. With one, it shows *Patch settings will change*: the
+zip's copy uses the built-in machines, and Install switches it to the SpotPass week. Patches
+from other releases copied by hand show as unknown.
 
 ### Why the config edit is so careful
 

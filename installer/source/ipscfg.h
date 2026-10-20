@@ -11,7 +11,8 @@
  *
  * The block is found by its magic among the IPS records, so the app needs
  * no table of addresses. The installer writes the values for the console
- * before saving code.ips; the values in the release file are only defaults.
+ * before saving code.ips. As built, the block holds no date and selects the
+ * built-in machines (patches/<version>.toml).
  *
  * Pure byte handling, unit-tested in tests/test_ipscfg.c.
  */
