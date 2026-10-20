@@ -187,7 +187,7 @@ Limitations: quantities reset to 1, and HOME Menu shortcut badges become normal 
 The game can't find a Nintendo Network ID. You are probably on a Pretendo account: switch back to Nintendo with Nimbus.
 
 **The hall is empty or has no machines.**
-The patch was made for another SpotPass week than the one in your `boss.sarc`. Patches up to v0.4 had a fixed week. Run the installer app: it reads your week and installs a patch set up for it. Without the app, [build it with `--spotpass`](#building-for-your-spotpass-week).
+The patch was made for another SpotPass week than the one in your `boss.sarc`. Patches up to v0.5.0 had a fixed week. Run the installer app: it reads your week and installs a patch set up for it. Without the app, [build it with `--spotpass`](#building-for-your-spotpass-week).
 
 **The game stops with an SD card error before the title screen.**
 Your extdata has no `boss.sarc`. Run the installer app: it switches the patch to the game's built-in machines. The patch can't bring back the SpotPass machines, because that data belongs to Nintendo.

@@ -67,7 +67,7 @@ APP_UNIQUE_ID	:=	0xBADA0
 # always leaves minor at 0, so FBI shows 0.1.0 as "0.0.0". The on-screen
 # version is the reliable one.
 VERSION_MAJOR	:=	0
-VERSION_MINOR	:=	4
+VERSION_MINOR	:=	6
 VERSION_MICRO	:=	0
 VERSION		:=	$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_MICRO)
 
