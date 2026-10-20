@@ -5,22 +5,10 @@
 
 #include <string.h>
 
+#include "bytes.h"
 #include "ips.h"
 
 static const unsigned char MAGIC[8] = {'R', 'C', 'L', 'W', 'C', 'F', 'G', '1'};
-
-static uint32_t get32(const unsigned char *p)
-{
-	return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
-}
-
-static void put32(unsigned char *p, uint32_t v)
-{
-	p[0] = (unsigned char)v;
-	p[1] = (unsigned char)(v >> 8);
-	p[2] = (unsigned char)(v >> 16);
-	p[3] = (unsigned char)(v >> 24);
-}
 
 long ipscfg_find(const unsigned char *ips, size_t size)
 {
@@ -51,8 +39,8 @@ bool ipscfg_read(const unsigned char *ips, size_t size, IpsSettings *out)
 	if (at < 0)
 		return false;
 	const unsigned char *p = ips + at;
-	out->anchor_ms = (uint64_t)get32(p + 8) | (uint64_t)get32(p + 12) << 32;
-	out->mode = get32(p + 16);
+	out->anchor_ms = (uint64_t)le32(p + 8) | (uint64_t)le32(p + 12) << 32;
+	out->mode = le32(p + 16);
 	return true;
 }
 
@@ -64,9 +52,9 @@ bool ipscfg_write(unsigned char *ips, size_t size, const IpsSettings *in)
 	if (at < 0)
 		return false;
 	unsigned char *p = ips + at;
-	put32(p + 8, (uint32_t)in->anchor_ms);
-	put32(p + 12, (uint32_t)(in->anchor_ms >> 32));
-	put32(p + 16, in->mode);
+	put_le32(p + 8, (uint32_t)in->anchor_ms);
+	put_le32(p + 12, (uint32_t)(in->anchor_ms >> 32));
+	put_le32(p + 16, in->mode);
 	return true;
 }
 

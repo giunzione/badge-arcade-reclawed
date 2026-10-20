@@ -24,19 +24,24 @@ typedef enum
 	NET_ERR_OTHER,    /* keep last (the tests loop up to it) */
 } NetStatus;
 
-/* Start sockets and curl; call once before net_get(). */
+/* Starts sockets and curl; call once before net_get(). Returns false if they
+ * can't start (then every net_get() fails with NET_ERR_INIT). */
 bool net_init(void);
+
+/* Shuts down what net_init() started. */
 void net_exit(void);
 
-/* Make running and future net_get() calls fail quickly (used when the app
+/* Makes running and future net_get() calls fail quickly (used when the app
  * closes while a download is still going). Safe from any thread. */
 void net_cancel(void);
 
-/* Download `url` into a malloc'd buffer (caller frees), at most `max` bytes.
- * A NUL is appended after the data (not counted in *size). */
+/* Downloads `url`, at most `max` bytes.
+ *
+ * On NET_OK, *data is a malloc'd buffer the caller frees and *size its length;
+ * a NUL follows the data (not counted in *size). */
 NetStatus net_get(const char *url, unsigned char **data, size_t *size, size_t max);
 
-/* Short reason for the UI (at most 24 chars). */
+/* Returns a short reason for `st`, for the UI (at most 24 characters). */
 const char *net_status_str(NetStatus st);
 
 #endif

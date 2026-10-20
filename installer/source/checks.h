@@ -65,8 +65,10 @@ typedef struct
 		PatchSource source;
 		char patch_release[32];
 		PatchState sd_patch;      /* the code.ips on the SD vs the chosen patch (installed.h) */
-		char sd_release[32];      /* release of the app's own patch on the SD, from its record ("" if unknown) */
-		int sd_catalog;           /* catalog mode in the code.ips on the SD, -1 if none / no settings block */
+		char sd_release[32];      /* release of the app's own patch on the SD, from its
+		                          * record ("" if unknown) */
+		int sd_catalog;           /* catalog mode in the code.ips on the SD; -1 if there
+		                          * is none or it has no settings block */
 
 		/* boss.sarc in the game's extdata, and what the chosen patch was set to */
 		SpotPassWeek spotpass;
@@ -75,8 +77,9 @@ typedef struct
 	} game[GAME_TITLE_COUNT];
 } SystemState;
 
-/* Which machines to install the patch with: the SpotPass week when
- * boss.sarc is usable and the user didn't pick the built-in ones. */
+/* Returns which machines to install the patch with: the SpotPass week when
+ * `week` is usable and the user didn't pick the built-in ones
+ * (`want_builtin`). */
 CatalogMode checks_catalog(const SpotPassWeek *week, bool want_builtin);
 
 typedef enum
@@ -113,6 +116,8 @@ typedef struct
 	bool catalog_builtin;  /* the target's patch will use the built-in machines */
 } CheckReport;
 
+/* Judges the console state `s`: writes the lines to show and the install
+ * decision into `out`. */
 void checks_run(const SystemState *s, CheckReport *out);
 
 #endif

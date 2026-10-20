@@ -1,0 +1,24 @@
+# Lint rules for the Python tools (CI: "Lint Python"). Run: ruff check .
+#
+# PEP 8 (pycodestyle E/W), pyflakes (F), PEP 8 naming (N), import order (I),
+# bug-prone patterns (B), modern syntax for the minimum Python (UP), simpler
+# code (SIM), and docstrings in the Google style (D).
+#
+# Lines may be up to 99 characters: PEP 8 allows teams to agree on that, and
+# the tools hold long tables, paths and messages.
+line-length = 99
+target-version = "py311"
+extend-exclude = ["installer/vendor"]
+
+[lint]
+select = ["E", "W", "F", "N", "I", "B", "UP", "SIM", "D"]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+# The usage block in a tool's module docstring is aligned for the terminal.
+"tools/build_ips.py" = ["E501"]
+
+# No `ruff format`: PEP 8 doesn't require one layout, and the tools keep some
+# tables and aligned comments by hand.

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-make_qr.py - draw the QR code that FBI scans to install the installer app.
+"""Draws the QR code that FBI scans to install the installer app.
 
 The URL points at the newest *full* release (GitHub's "latest" skips
 pre-releases), and the release workflow always uploads the CIA under the same
@@ -12,6 +11,7 @@ Usage:
 
 Requires segno (pip install segno). Not needed to build the patch or the app.
 """
+
 import argparse
 import os
 import sys
@@ -27,9 +27,12 @@ DEFAULT_URL = ('https://github.com/giunzione/badge-arcade-reclawed/'
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    """Parses the command line and writes the PNG."""
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--url', default=DEFAULT_URL, help='what the QR code points to')
-    ap.add_argument('--out', default=os.path.join(ROOT, 'docs', 'install-qr.png'), help='output PNG')
+    ap.add_argument('--out', default=os.path.join(ROOT, 'docs', 'install-qr.png'),
+                    help='output PNG')
     a = ap.parse_args()
 
     # Error correction M and a quiet zone of 4 modules: easy for the 3DS camera.

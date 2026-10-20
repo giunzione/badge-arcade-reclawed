@@ -55,13 +55,15 @@ static void test_log(void)
 	if (!f)
 		return;
 	static const char *const levels[] = {"ok", "info", "warn", "STOP"};
-	fprintf(f, "--- v%s checking=%d can_install=%d nothing_to_do=%d target=%d report=%d uninstall=%d\n",
+	fprintf(f, "--- v%s checking=%d can_install=%d nothing_to_do=%d target=%d report=%d"
+	           " uninstall=%d\n",
 	        APP_VERSION, report.checking, report.can_install, report.nothing_to_do, report.target,
 	        report.report_target, report.uninstall_target);
 	if (report.target >= 0)
 	{
 		const SpotPassWeek *w = &state.game[report.target].spotpass;
-		fprintf(f, "spotpass=%s first=%04d-%02d-%02d days=%d machines=%d catalog=%d choice=%d sd_catalog=%d\n",
+		fprintf(f, "spotpass=%s first=%04d-%02d-%02d days=%d machines=%d catalog=%d choice=%d"
+		           " sd_catalog=%d\n",
 		        spotpass_status_str(w->status), w->first_day.year, w->first_day.month,
 		        w->first_day.day, w->days, w->machines, state.game[report.target].catalog,
 		        report.catalog_choice, state.game[report.target].sd_catalog);
@@ -105,6 +107,7 @@ static void refresh(void)
 	}
 }
 
+/* Adds one step (e.g. "Patch") and its outcome to the result dialog. */
 static void add_line(const char *label, InstResult r, const char *msg)
 {
 	if (ui.line_count >= UI_RESULT_LINES)
@@ -115,6 +118,7 @@ static void add_line(const char *label, InstResult r, const char *msg)
 	snprintf(l->text, sizeof(l->text), "%.63s", msg); /* one dialog line; longer text is cut */
 }
 
+/* Opens the result dialog with `title`, in red when `failed`. */
 static void open_result(const char *title, bool failed)
 {
 	ui.dialog = DIALOG_RESULT;
@@ -140,6 +144,8 @@ static bool restart_console(void)
 	return false;
 }
 
+/* Install: writes the chosen patch and its record, enables game patching,
+ * and starts the restart countdown if the toggle is on. */
 static void do_install(void)
 {
 	int t = report.target;
@@ -165,7 +171,8 @@ static void do_install(void)
 		 * A failure here doesn't undo the install: the patch itself works. */
 		if (patch != INST_FAILED &&
 		    inst_write_record(record, state.game[t].patch_release, state.game[t].code,
-		                      state.game[t].code_version, ips, size, msg, sizeof(msg)) == INST_FAILED)
+		                      state.game[t].code_version, ips, size, msg,
+		                      sizeof(msg)) == INST_FAILED)
 			add_line("Patch record", INST_FAILED, msg);
 	}
 	InstResult cfg = INST_FAILED;
@@ -197,6 +204,7 @@ static void open_report(void)
 	ui.dialog = DIALOG_REPORT;
 }
 
+/* Uninstall: deletes the patch and its record (after the confirmation). */
 static void do_uninstall(void)
 {
 	char on_sd[96], record[96], msg[96];
@@ -209,6 +217,7 @@ static void do_uninstall(void)
 	refresh();
 }
 
+/* Restart: restarts the console, or says in the dialog that it failed. */
 static void do_restart(void)
 {
 	if (restart_console())

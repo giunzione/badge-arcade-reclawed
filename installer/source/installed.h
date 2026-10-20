@@ -38,12 +38,18 @@ typedef struct
 	char sha256[SHA256_HEX_LEN + 1];  /* of the code.ips written next to it */
 } InstalledRecord;
 
-/* Write the record for the patch `ips` into `out`. Returns the text length,
- * or -1 if it doesn't fit or `release` isn't a single printable word. */
+/* Writes the record for the `size`-byte patch `ips` into `out` (`len` bytes).
+ *
+ * `release` is the release tag, `code` and `version` the game code the patch
+ * was made for (CODE_UPDATE / CODE_BASE and its title version). Returns the
+ * text length, or -1 if it doesn't fit or `release` isn't a single printable
+ * word. */
 int installed_format(char *out, size_t len, const char *release, char code, unsigned version,
                      const void *ips, size_t size);
 
-/* Parse a record file. False if it isn't one this app understands. */
+/* Parses the `len` bytes of a record file into `out`.
+ *
+ * Returns false (and clears `out`) if it isn't a record this app understands. */
 bool installed_parse(const char *text, size_t len, InstalledRecord *out);
 
 typedef enum
@@ -54,9 +60,11 @@ typedef enum
 	RELEASE_UNKNOWN, /* not both of the form [v]X[.Y[.Z]][-suffix], e.g. "dev" */
 } ReleaseOrder;
 
-/* Compare two release tags. Numbers compare numerically; a "-suffix" marks a
- * pre-release, older than the same numbers without one (v0.5.0-beta < v0.5.0);
- * two suffixes compare as text (beta < beta2 < rc1). */
+/* Compares the release tags `a` and `b`.
+ *
+ * Numbers compare numerically; a "-suffix" marks a pre-release, older than the
+ * same numbers without one (v0.5.0-beta < v0.5.0); two suffixes compare as text
+ * (beta < beta2 < rc1). */
 ReleaseOrder release_compare(const char *a, const char *b);
 
 /* The patch on the SD compared with the one the app would install now. */
@@ -77,7 +85,9 @@ typedef enum
 	                      * returns it */
 } PatchState;
 
-/* Classify the code.ips on the SD.
+/* Returns how the code.ips on the SD compares with the patch the app would
+ * install now (never PATCH_SETTINGS: see above).
+ *
  *   on_sd           a code.ips is there
  *   same_as_chosen  it is byte for byte the patch the app would install
  *   rec             the record next to it, or NULL if missing / unreadable

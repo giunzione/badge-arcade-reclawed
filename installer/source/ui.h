@@ -48,19 +48,25 @@ typedef struct
 	bool restart_failed;            /* show "restart manually" in the result */
 } UiState;
 
-/* Set up citro2d, the render targets, the system font and the logo.
+/* Sets up citro2d, the render targets, the system font and the logo.
+ *
  * Returns false if the graphics can't be started. */
 bool ui_init(void);
+
+/* Frees what ui_init() set up; also safe after a failed ui_init(). */
 void ui_exit(void);
 
-/* Draw one frame of both screens. */
+/* Draws one frame of both screens: the checks `r`, the menu `m`, the dialog
+ * in `u`, and the app `version` in the corner. */
 void ui_draw(const CheckReport *r, const Menu *m, const UiState *u, const char *version);
 
-/* Dialog buttons under a touch point: 1 = confirm (A), 2 = cancel (B), 0 = none. */
+/* Returns the dialog button under the touch point (`x`, `y`): 1 = confirm (A),
+ * 2 = cancel (B), 0 = none. */
 int ui_dialog_button_at(const UiState *u, int x, int y);
 
-/* Encode the URL the report dialog shows as a QR code. Returns false if it
- * doesn't fit in a QR code small enough for the screen. */
+/* Encodes `url` as the QR code the report dialog shows.
+ *
+ * Returns false if it doesn't fit in a QR code small enough for the screen. */
 bool ui_set_report_url(const char *url);
 
 #endif

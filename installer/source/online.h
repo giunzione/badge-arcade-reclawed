@@ -47,14 +47,16 @@ typedef struct
 	volatile bool finished;
 } OnlineJob;
 
-/* Start the thread. Returns false (and marks the job finished, failed) if it
- * can't be started. */
+/* Starts the job's thread; `job->want` must be filled in first.
+ *
+ * Returns false (and marks the job finished and failed) if the thread can't
+ * be started. */
 bool online_start(OnlineJob *job);
 
-/* True once the work is over; joins the thread the first time. */
+/* Returns true once the work is over. Joins the thread the first time. */
 bool online_done(OnlineJob *job);
 
-/* Free the downloaded files. */
+/* Frees the downloaded files. Call only once online_done() returned true. */
 void online_free(OnlineJob *job);
 
 #endif

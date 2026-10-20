@@ -76,9 +76,10 @@ int fops_read(const char *path, unsigned char **data, size_t *size, size_t max)
 
 	int ret = -1;
 	unsigned char *buf = NULL;
+	long len;
 	if (fseek(f, 0, SEEK_END) != 0)
 		goto out;
-	long len = ftell(f);
+	len = ftell(f);
 	if (len < 0 || (size_t)len > max || fseek(f, 0, SEEK_SET) != 0)
 		goto out;
 	buf = malloc((size_t)len + 1);

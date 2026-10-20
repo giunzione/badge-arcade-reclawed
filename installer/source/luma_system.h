@@ -18,6 +18,8 @@ typedef struct
 	bool config_on_sd;            /* config and luma/titles live on the SD, not CTRNAND */
 } LumaSystem;
 
+/* Asks the running Luma3DS for its version and boot options. `out` says
+ * detected = false (and nothing else) when Luma3DS doesn't answer. */
 void luma_system_query(LumaSystem *out);
 
 #endif

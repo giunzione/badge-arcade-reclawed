@@ -80,7 +80,8 @@ static void no_or_bad_block(void)
 	CHECK(ipscfg_find(NULL, 0) == -1);
 
 	/* Magic cut short by the end of its record. */
-	static const unsigned char cut[] = "PATCH" "\x32\x37\xA0" "\x00\x0C" "RCLWCFG1" "\0\0\0\0" "EOF";
+	static const unsigned char cut[] = "PATCH" "\x32\x37\xA0" "\x00\x0C"
+	                                   "RCLWCFG1" "\0\0\0\0" "EOF";
 	CHECK(ipscfg_find(cut, sizeof(cut) - 1) == -1);
 
 	/* Two blocks: the game reads one, the app can't know which. */
@@ -97,7 +98,8 @@ static void no_or_bad_block(void)
 	CHECK(ipscfg_find(two, sizeof(two)) == -1);
 
 	/* Off a word boundary inside the record: not a block. */
-	static const unsigned char odd[] = "PATCH" "\x32\x37\xA0" "\x00\x16" "xxRCLWCFG1" "\0\0\0\0\0\0\0\0\0\0\0\0" "EOF";
+	static const unsigned char odd[] = "PATCH" "\x32\x37\xA0" "\x00\x16"
+	                                   "xxRCLWCFG1" "\0\0\0\0\0\0\0\0\0\0\0\0" "EOF";
 	CHECK(ipscfg_find(odd, sizeof(odd) - 1) == -1);
 }
 

@@ -21,11 +21,13 @@ typedef struct
 	size_t start, end;
 } Span;
 
+/* Returns non-zero for the blanks inih skips around keys and values. */
 static int is_space(char c)
 {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\v' || c == '\f';
 }
 
+/* Returns `s` without the blanks at both ends. */
 static Span trim(const char *text, Span s)
 {
 	while (s.start < s.end && is_space(text[s.start]))
@@ -35,6 +37,7 @@ static Span trim(const char *text, Span s)
 	return s;
 }
 
+/* Returns non-zero if the text in `s` is exactly `word`. */
 static int span_equals(const char *text, Span s, const char *word)
 {
 	size_t n = strlen(word);

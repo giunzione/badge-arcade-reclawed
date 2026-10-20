@@ -157,7 +157,9 @@ To build a patch that plays your SpotPass machines without the installer app, po
 
 The output goes to `build/<region>/luma/titles/<title id>/code.ips` (for EUR: `build/EUR/luma/titles/0004000000153600/code.ips`). If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
 
-The installer app lives in [`installer/`](installer/); see its [README](installer/README.md) for how to build it (devkitPro). [`tools/make_manifest.py`](tools/make_manifest.py) lists the built patches in `patches.txt`, which every release publishes together with the patch files: the app downloads the newest ones and also carries a built-in copy for offline use. Each TOML's `[meta] code_title` / `code_version` say which game version it fits.
+The Python tools follow PEP 8 with Google-style docstrings, checked in CI with [ruff](https://docs.astral.sh/ruff/) (rules in [`ruff.toml`](ruff.toml)): `pip install -r requirements-dev.txt`, then `ruff check .`. `python3 tools/test_spotpass_week.py` runs their tests.
+
+The installer app lives in [`installer/`](installer/); see its [README](installer/README.md) for how to build it (devkitPro) and its code conventions. [`tools/make_manifest.py`](tools/make_manifest.py) lists the built patches in `patches.txt`, which every release publishes together with the patch files: the app downloads the newest ones and also carries a built-in copy for offline use. Each TOML's `[meta] code_title` / `code_version` say which game version it fits.
 
 ---
 

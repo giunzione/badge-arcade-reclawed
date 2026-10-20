@@ -59,13 +59,17 @@ typedef enum
 	MANIFEST_ERR_TOO_MANY, /* more than MANIFEST_MAX_ENTRIES patches */
 } ManifestStatus;
 
-/* Parse `len` bytes of patches.txt. On error `m` holds no entries. */
+/* Parses `len` bytes of patches.txt into `m`.
+ *
+ * On error `m` holds no entries. */
 ManifestStatus manifest_parse(const char *text, size_t len, Manifest *m);
 
-/* The entry for this game code, or NULL. */
+/* Returns the entry of `m` for this game code (base title ID, CODE_UPDATE /
+ * CODE_BASE and its title version), or NULL if there is none. */
 const PatchEntry *manifest_find(const Manifest *m, uint64_t base_tid, char code, unsigned version);
 
-/* True if `data` is exactly the file the entry describes (size and SHA-256). */
+/* Returns true if the `size` bytes at `data` are exactly the file `e` describes
+ * (size and SHA-256). */
 bool manifest_entry_matches(const PatchEntry *e, const void *data, size_t size);
 
 /* What happened to the online copy of one game's patch. */
@@ -87,7 +91,9 @@ typedef enum
 	SOURCE_ONLINE,  /* downloaded from the latest release */
 } PatchSource;
 
-/* The hybrid rule: the latest release online when its manifest was fetched
+/* Chooses where the patch for this game code comes from.
+ *
+ * The hybrid rule: the latest release online when its manifest was fetched
  * (`online` not NULL), lists this game code and its file downloaded and
  * verified (`online_file_ok`); otherwise the app's built-in copy, if it has
  * one. `*out` gets the chosen entry (NULL for SOURCE_NONE). */

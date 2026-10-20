@@ -20,6 +20,8 @@
 #define MANIFEST_MAX_SIZE (64 * 1024)
 #define THREAD_STACK (64 * 1024) /* TLS handshakes need a fair amount of stack */
 
+/* The thread: downloads the manifest, then each wanted patch it lists, and
+ * fills the OnlineJob `arg` with the results. */
 static void work(void *arg)
 {
 	OnlineJob *job = arg;

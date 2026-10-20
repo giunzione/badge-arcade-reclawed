@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "compiler.h"
 #include "fileops.h"
 #include "installed.h"
 #include "ips.h"
@@ -16,6 +17,10 @@
  * a real config, so refuse it rather than guess. */
 #define LUMA_CONFIG_MAX_SIZE 0x2400
 
+/* Writes the outcome message (printf-style) into `msg`, if there is one, and
+ * returns `r`, so actions can end with `return report(...)`. */
+static InstResult report(InstResult r, char *msg, size_t msg_len, const char *fmt, ...)
+	PRINTF_LIKE(4, 5);
 static InstResult report(InstResult r, char *msg, size_t msg_len, const char *fmt, ...)
 {
 	if (msg && msg_len)
@@ -28,7 +33,8 @@ static InstResult report(InstResult r, char *msg, size_t msg_len, const char *fm
 	return r;
 }
 
-InstResult inst_write_patch(const void *ips, size_t size, const char *dst, char *msg, size_t msg_len)
+InstResult inst_write_patch(const void *ips, size_t size, const char *dst, char *msg,
+                            size_t msg_len)
 {
 	unsigned records;
 	if (!ips || !ips_is_valid(ips, size, &records))

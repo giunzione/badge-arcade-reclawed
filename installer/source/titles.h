@@ -30,8 +30,8 @@ typedef struct
 #define GAME_TITLE_COUNT 3
 extern const GameTitle GAME_TITLES[GAME_TITLE_COUNT];
 
-/* Index in GAME_TITLES of the title with this base ID (as 16 hex digits,
- * either case), or -1. */
+/* Returns the index in GAME_TITLES of the title whose base ID is
+ * `base_tid_hex` (16 hex digits, either case), or -1. */
 int titles_find(const char *base_tid_hex);
 
 #endif

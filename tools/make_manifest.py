@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-make_manifest.py - list the built patches for the installer app (patches.txt).
+"""Lists the built patches for the installer app (patches.txt).
 
 Reads every patches/*.toml, takes the code.ips that build_ips.py wrote for it
 (build/<name>/luma/titles/<title id>/code.ips, <name> from tools/patch_meta.py)
@@ -23,6 +22,7 @@ Usage:
 
 Requires Python 3.11+ (tomllib). Run tools/build_ips.py (or build_all.sh) first.
 """
+
 import argparse
 import glob
 import hashlib
@@ -36,7 +36,7 @@ try:
 except ModuleNotFoundError:
     sys.exit('Python 3.11 or newer is required (tomllib).')
 
-from patch_meta import build_name    # build/<name>/ folder per patch
+from patch_meta import build_name  # build/<name>/ folder per patch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FORMAT = 1
@@ -44,7 +44,19 @@ CODES = {'update': 'u', 'base': 'b'}
 
 
 def entry_for(toml_path, build_dir):
-    """Return (sort key, manifest line, source ips, file name) for one patch definition."""
+    """Describes one built patch for the manifest.
+
+    Args:
+        toml_path: Path of the patch definition (patches/<version>.toml).
+        build_dir: The build folder that build_ips.py wrote into.
+
+    Returns:
+        A tuple (sort key, manifest line, path of the built code.ips, file name
+        in the manifest). The sort key is (title ID, code letter, version).
+
+    Exits the program with a message if the [meta] table is incomplete or the
+    patch hasn't been built.
+    """
     with open(toml_path, 'rb') as f:
         meta = tomllib.load(f).get('meta', {})
     where = os.path.relpath(toml_path, ROOT)
@@ -63,18 +75,24 @@ def entry_for(toml_path, build_dir):
     ips = os.path.join(build_dir, build_name(meta), 'luma', 'titles', tid, 'code.ips')
     if not os.path.isfile(ips):
         sys.exit(f'{where}: {os.path.relpath(ips, ROOT)} not found, run tools/build_ips.py first')
-    data = open(ips, 'rb').read()
+    with open(ips, 'rb') as f:
+        data = f.read()
 
     c = CODES[code]
     name = f'patch-{region}-{c}{version}.ips'
-    line = f'{tid.upper()} {c}{version} {region} {name} {len(data)} {hashlib.sha256(data).hexdigest()}'
+    line = (f'{tid.upper()} {c}{version} {region} {name} {len(data)} '
+            f'{hashlib.sha256(data).hexdigest()}')
     return (tid.upper(), c, version), line, ips, name
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--release', default='dev', help='release name written in the header (e.g. v0.4.0)')
-    ap.add_argument('--build', default=os.path.join(ROOT, 'build'), help='build folder of build_ips.py')
+    """Parses the command line, then writes build/patches/."""
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--release', default='dev',
+                    help='release name written in the header (e.g. v0.4.0)')
+    ap.add_argument('--build', default=os.path.join(ROOT, 'build'),
+                    help='build folder of build_ips.py')
     a = ap.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9._-]{1,31}', a.release):
         sys.exit('--release: letters, digits, ".", "_", "-" only (max 31)')
@@ -98,7 +116,8 @@ def main():
         f.write(f'reclawed-patches {FORMAT} {a.release}\n')
         for _, line, _, _ in entries:
             f.write(line + '\n')
-    print(f'Wrote {os.path.relpath(out, ROOT)}/patches.txt ({len(entries)} patches, release {a.release})')
+    print(f'Wrote {os.path.relpath(out, ROOT)}/patches.txt '
+          f'({len(entries)} patches, release {a.release})')
 
 
 if __name__ == '__main__':

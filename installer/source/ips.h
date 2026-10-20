@@ -11,8 +11,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* True if `data` is a well-formed IPS. If `records` is not NULL it receives
- * the number of records. */
+/* Returns true if the `size` bytes at `data` are a well-formed IPS.
+ *
+ * If `records` is not NULL, it receives the number of records. */
 bool ips_is_valid(const unsigned char *data, size_t size, unsigned *records);
 
 #endif

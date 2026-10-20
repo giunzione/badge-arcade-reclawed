@@ -57,6 +57,7 @@ void probe_free(void)
 	}
 }
 
+/* Parses the app's own patches.txt (RomFS) the first time it is needed. */
 static void load_builtin(void)
 {
 	if (builtin_loaded)
@@ -81,6 +82,7 @@ static bool title_version(u64 tid, unsigned *version)
 	return true;
 }
 
+/* Luma3DS as booted, and its config.ini on the SD. */
 static void probe_luma(SystemState *s)
 {
 	LumaSystem luma;
@@ -127,7 +129,8 @@ static void probe_spotpass(SpotPassWeek *w, u32 extdata_id)
 {
 	u32 path[3] = {MEDIATYPE_SD, extdata_id, 0};
 	FS_Archive arch;
-	Result r = FSUSER_OpenArchive(&arch, ARCHIVE_EXTDATA, (FS_Path){PATH_BINARY, sizeof(path), path});
+	FS_Path where = {PATH_BINARY, sizeof(path), path};
+	Result r = FSUSER_OpenArchive(&arch, ARCHIVE_EXTDATA, where);
 	if (R_FAILED(r))
 	{
 		w->status = not_found(r) ? SPOTPASS_MISSING : SPOTPASS_UNREADABLE;
@@ -170,6 +173,7 @@ done:
 	FSUSER_CloseArchive(arch);
 }
 
+/* GAME_TITLES[i]: installed versions, the code that runs, boss.sarc. */
 static void probe_game(SystemState *s, int i)
 {
 	s->game[i].installed = title_version(GAME_TITLES[i].base_tid, &s->game[i].base_version);
@@ -288,6 +292,7 @@ static IpsSettings wanted_settings(const SystemState *s, int i, const IpsSetting
 	return w;
 }
 
+/* Returns true if `a` and `b` set the same anchor and catalog mode. */
 static bool same_settings(const IpsSettings *a, const IpsSettings *b)
 {
 	return a->anchor_ms == b->anchor_ms && a->mode == b->mode;

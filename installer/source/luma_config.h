@@ -38,15 +38,18 @@ typedef struct
 	size_t value_offset; /* offset in the text of the '0'/'1' character */
 } LumaCfgInfo;
 
-/* Parse `len` bytes of config.ini text (no NUL terminator needed).
+/* Parses `len` bytes of config.ini text (no NUL terminator needed).
+ *
  * Fills `info` as far as possible, also on error. */
 LumaCfgStatus lumacfg_parse(const char *text, size_t len, LumaCfgInfo *info);
 
-/* Set enable_game_patching to `enabled` (0/1) in place. The text length never
- * changes. On error the text is left untouched. */
+/* Sets enable_game_patching to `enabled` (0/1) in the config.ini text, in place.
+ *
+ * The text length never changes. On error the text is left untouched. */
 LumaCfgStatus lumacfg_set_game_patching(char *text, size_t len, int enabled);
 
-/* Short English description of a status, for the UI (at most 29 chars). */
+/* Returns a short English description of `status` for the UI (at most 29
+ * characters). */
 const char *lumacfg_status_str(LumaCfgStatus status);
 
 #endif

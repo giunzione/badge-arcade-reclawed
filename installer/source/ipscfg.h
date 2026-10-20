@@ -37,17 +37,24 @@ typedef struct
 	uint32_t mode; /* CatalogMode */
 } IpsSettings;
 
-/* Offset in the IPS file of the settings block, or -1 if the file is not a
- * valid IPS or holds no block (or more than one). */
+/* Returns the offset of the settings block in the `size`-byte IPS file `ips`,
+ * or -1 if the file is not a valid IPS or holds no block (or more than one). */
 long ipscfg_find(const unsigned char *ips, size_t size);
 
-/* Read / write the block in place. False if there is none, or (write) if
- * the mode is not a known one. */
+/* Reads the settings block of the IPS `ips` into `out`.
+ *
+ * Returns false if the file has no block (see ipscfg_find()). */
 bool ipscfg_read(const unsigned char *ips, size_t size, IpsSettings *out);
+
+/* Writes `in` into the settings block of the IPS `ips`, in place.
+ *
+ * Returns false, leaving the file unchanged, if it has no block or the mode
+ * is not a known one. */
 bool ipscfg_write(unsigned char *ips, size_t size, const IpsSettings *in);
 
-/* True if two patches are the same file apart from their settings: both
- * have a block, at the same place, and every other byte is equal. */
+/* Returns true if the patches `a` and `b` are the same file apart from their
+ * settings: both have a block, at the same place, and every other byte
+ * (the magic included) is equal. */
 bool ipscfg_same_except_settings(const unsigned char *a, size_t a_size, const unsigned char *b,
                                  size_t b_size);
 

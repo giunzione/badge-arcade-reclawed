@@ -47,24 +47,28 @@ typedef struct
 	int x, y, w, h;
 } MenuRect;
 
-/* Everything enabled except what menu_update() turns off; toggle on. */
+/* Initialises `m`: every item enabled (menu_update() turns some off), Install
+ * selected, "Restart after install" on, the SpotPass week as the catalog. */
 void menu_init(Menu *m);
 
-/* Enable items from the checks: Install when there is something to install
- * (or, labelled "Report", when the game's version has no patch), Uninstall
- * when a patch is on the SD, Restart when the console can restart, Machines
+/* Enables the items the checks `r` allow: Install when there is something to
+ * install (or, labelled "Report", when the game's version has no patch),
+ * Uninstall when a patch is on the SD, Restart when `can_restart`, Machines
  * when there is a choice (boss.sarc is usable).
+ *
  * Moves the selection off a disabled item, and back to Install when it was
  * only moved off it because Install was disabled for a while (the user
  * hasn't picked something else since). */
 void menu_update(Menu *m, const CheckReport *r, bool can_restart);
 
-/* D-pad: move one cell left/right (dx) or up/down (dy), skipping disabled
- * items. Stays put at the edges. */
+/* Moves the selection one cell left/right (`dx`) or up/down (`dy`), as the
+ * D-pad does, skipping disabled items. Stays put at the edges. */
 void menu_move(Menu *m, int dx, int dy);
 
-/* Screen rectangle of an item, and the item under a touch point (or ITEM_NONE). */
+/* Returns the bottom-screen rectangle of `item` (all zero for ITEM_NONE). */
 MenuRect menu_item_rect(MenuItem item);
+
+/* Returns the item under the touch point (`x`, `y`), or ITEM_NONE. */
 MenuItem menu_item_at(int x, int y);
 
 #endif

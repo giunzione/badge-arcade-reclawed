@@ -104,7 +104,10 @@ PATCH_BUILD	?=	../build
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
-CFLAGS	:=	-g -Wall -Wextra -O2 -mword-relocations \
+# C99 with GNU extensions: libctru's and curl's headers use them (anonymous
+# unions, empty initializers), so strict -std=c99 can't compile them. Our own
+# portable modules are also checked as strict C99 by tests/Makefile.
+CFLAGS	:=	-std=gnu99 -g -Wall -Wextra -O2 -mword-relocations \
 			-ffunction-sections \
 			$(ARCH)
 

@@ -36,7 +36,8 @@ static void block(uint32_t h[8], const uint8_t *p)
 	uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
 	for (int i = 0; i < 64; i++)
 	{
-		uint32_t t1 = hh + (ROTR(e, 6) ^ ROTR(e, 11) ^ ROTR(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i];
+		uint32_t sum1 = ROTR(e, 6) ^ ROTR(e, 11) ^ ROTR(e, 25);
+		uint32_t t1 = hh + sum1 + ((e & f) ^ (~e & g)) + K[i] + w[i];
 		uint32_t t2 = (ROTR(a, 2) ^ ROTR(a, 13) ^ ROTR(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
 		hh = g;
 		g = f;
@@ -67,7 +68,7 @@ void sha256(const void *data, size_t size, uint8_t out[SHA256_LEN])
 	size_t tail_len = left < 56 ? 64 : 128;
 	uint64_t bits = (uint64_t)size * 8;
 	for (int i = 0; i < 8; i++)
-		tail[tail_len - 1 - i] = (uint8_t)(bits >> (8 * i));
+		tail[tail_len - 1 - (size_t)i] = (uint8_t)(bits >> (8 * i));
 	block(h, tail);
 	if (tail_len == 128)
 		block(h, tail + 64);

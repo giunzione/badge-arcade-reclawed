@@ -7,7 +7,7 @@
  * short (about 220 bytes) so the QR code stays small enough to scan from the
  * bottom screen.
  *
- * Pure string building, unit-tested in tests/test_report.c.
+ * Pure string building, unit-tested in tests/test_manifest.c.
  */
 #ifndef REPORT_H
 #define REPORT_H
@@ -18,13 +18,17 @@
 #define REPORT_REPO_URL "https://github.com/giunzione/badge-arcade-reclawed"
 #define REPORT_URL_MAX 320
 
-/* Write the issue URL into `out`. `luma` may be NULL when Luma3DS wasn't
- * detected. Returns 0, or -1 if it doesn't fit in `len`. */
+/* Writes the issue URL for this game into `out` (`len` bytes).
+ *
+ * `code` and `version` are the game code that runs; `luma` is the Luma3DS
+ * version, or NULL when it wasn't detected. Returns 0, or -1 if the URL
+ * doesn't fit. */
 int report_issue_url(char *out, size_t len, const char *region, uint64_t base_tid, char code,
                      unsigned version, const char *app_version, const char *luma);
 
-/* Percent-encode `in` for a query string value (RFC 3986 unreserved
- * characters stay as they are). Returns 0, or -1 if it doesn't fit. */
+/* Percent-encodes `in` into `out` (`len` bytes) for a query string value
+ * (RFC 3986 unreserved characters stay as they are). Returns 0, or -1 if it
+ * doesn't fit. */
 int report_url_encode(const char *in, char *out, size_t len);
 
 #endif

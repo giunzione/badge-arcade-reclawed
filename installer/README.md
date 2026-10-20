@@ -209,6 +209,7 @@ for clangd and other editors.
 | `source/fileops.c`, `source/ips.c` | file helpers and the IPS check |
 | `source/ipscfg.c` | the patch's settings block: find, read and write it, compare two patches apart from it |
 | `source/spotpass.c` | `boss.sarc`: the SARC lookup, the week in `Schedule.xml`, dates |
+| `source/bytes.h`, `source/compiler.h` | little-endian helpers; the optional `PRINTF_LIKE` compiler check |
 | `tests/` | PC unit tests for everything except `main.c`, `ui.c`, `probe.c`, `online.c`, `net.c` and `luma_system.c` |
 | `gfx/` | images for the top screen, converted by tex3ds at build time: the Reclawed logo (made from `docs/logo.png`) and the small Divisione3DSAntimog "powered by" logo |
 | `meta/app.rsf` | makerom settings for the CIA (permissions, services) |
@@ -216,3 +217,19 @@ for clangd and other editors.
 | `build/` | build output, never committed. `build/romfs/` gets the patch manifest and certificates at build time |
 
 The app's title ID is `000400000BADA000` (unique ID `0xBADA0`, product code `CTR-H-RCLW`).
+
+### Code conventions
+
+- **C99** (ISO/IEC 9899:1999). The portable modules, everything `tests/` covers, are strict C99:
+  `tests/Makefile` builds them with `-std=c99 -pedantic` and extra warnings as errors.
+  The 3DS build uses `-std=gnu99`, because libctru's and curl's headers need GNU
+  extensions; the code in `source/` doesn't use any. C89 ("ANSI C") isn't possible for
+  the same reason, and the code relies on C99 (`stdbool.h`, `stdint.h`, `snprintf`, mixed
+  declarations).
+- **Comments** follow the Google C/C++ style guide. Every file starts with what it's for.
+  Every declaration in a header says what the function does, written as a description
+  ("Returns…", "Writes…"), what its arguments and result mean, and who frees memory.
+  Static functions get the same treatment when it isn't obvious from the name. Test
+  functions are named after what they check.
+- Layout as in the existing code: tabs, braces on their own line, lines up to ~100 columns.
+  `vendor/` is third-party code and stays as it was released.

@@ -29,5 +29,6 @@ void test_ips(void)
 	CHECK(!ips_is_valid(IPS("PATHCEOF"), NULL));              /* bad header */
 	CHECK(!ips_is_valid(IPS("PATCHEOFx"), NULL));             /* data after footer */
 	CHECK(!ips_is_valid(IPS("PATCH" "\x00\x00\x10" "\x00\x05" "ab" "EOF"), NULL)); /* truncated */
-	CHECK(!ips_is_valid(IPS("PATCH" "\x00\x00\x10" "\x00\x00" "\x00\x04" "x" "EOF"), NULL)); /* RLE */
+	/* RLE */
+	CHECK(!ips_is_valid(IPS("PATCH" "\x00\x00\x10" "\x00\x00" "\x00\x04" "x" "EOF"), NULL));
 }

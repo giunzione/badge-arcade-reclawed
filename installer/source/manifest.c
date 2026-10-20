@@ -26,6 +26,7 @@ static int split(char *line, char **fields, int max)
 	return n;
 }
 
+/* Returns true if `s` is not empty and made only of characters in `allowed`. */
 static bool all_chars(const char *s, const char *allowed)
 {
 	return *s && strspn(s, allowed) == strlen(s);
@@ -40,6 +41,8 @@ static bool parse_uint(const char *s, unsigned long *out)
 	return true;
 }
 
+/* Parses the six fields `f` of a patch line into `e`. Returns false if any of
+ * them is malformed. */
 static bool parse_entry(char **f, PatchEntry *e)
 {
 	/* base title ID */

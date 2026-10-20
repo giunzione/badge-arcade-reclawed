@@ -8,9 +8,14 @@
 # HOSTCC, not CC: devkitPro's rules export CC as the ARM cross compiler.
 # Only sources that use plain C + stdio are tested here; luma_system.c,
 # main.c and probe.c need libctru and run on the console only.
+#
+# The portable code is strict ISO C99 (-std=c99 -pedantic): no compiler
+# extensions, so it builds with any C99 compiler.
 #---------------------------------------------------------------------------------
 HOSTCC	?=	cc
-CFLAGS	:=	-std=c99 -g -O1 -Wall -Wextra -Werror -I../source
+WARN	:=	-Wall -Wextra -pedantic -Wshadow -Wstrict-prototypes -Wmissing-prototypes \
+		-Wwrite-strings -Wundef -Werror
+CFLAGS	:=	-std=c99 -g -O1 $(WARN) -I../source
 OUT	:=	../build/tests
 EXE	:=	$(OUT)/run_tests
 

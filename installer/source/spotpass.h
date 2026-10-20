@@ -52,30 +52,41 @@ typedef struct
 	int machines;    /* DefaultStage entries in the week */
 } SpotPassWeek;
 
-/* Size of the SARC header part (everything before the file data), from its
- * first SARC_HEADER_MIN bytes. False if it isn't a little-endian SARC or the
- * size is not plausible. */
+/* Reads the size of a SARC's header part (everything before the file data)
+ * into *header_size, from the archive's first `n` (at least SARC_HEADER_MIN)
+ * bytes `b`.
+ *
+ * Returns false if it isn't a little-endian SARC or the size is not
+ * plausible. */
 bool sarc_header_size(const unsigned char *b, size_t n, uint32_t *header_size);
 
-/* Find the member `name` in a SARC header part (as read by the size above).
- * Its data is bytes [*start, *end) of the archive file. */
+/* Finds the member `name` in the `n`-byte header part `hdr` of a SARC (see
+ * sarc_header_size()).
+ *
+ * Returns false if there is no such member or the header is damaged; else its
+ * data is bytes [*start, *end) of the archive file. */
 bool sarc_find(const unsigned char *hdr, size_t n, const char *name, uint32_t *start,
                uint32_t *end);
 
-/* Read the week out of a Schedule.xml. Sets out->status to SPOTPASS_OK or
- * SPOTPASS_NO_MACHINES. */
+/* Reads the week out of the `len` bytes of a Schedule.xml into `out`.
+ *
+ * Sets out->status to SPOTPASS_OK or SPOTPASS_NO_MACHINES. */
 void schedule_week(const char *xml, size_t len, SpotPassWeek *out);
 
-/* "YYYYMMDD" -> date. False if malformed or not a real day of 2000-2099. */
+/* Parses the `len` characters at `s` as a "YYYYMMDD" date into `out`.
+ *
+ * Returns false if they are malformed or not a real day of 2000-2099. */
 bool date_parse(const char *s, size_t len, Date *out);
 
-/* Days since 2000-01-01 (the 3DS epoch). */
+/* Returns the number of days from 2000-01-01 (the 3DS epoch) to `d`. */
 long date_days(Date d);
 
-/* Milliseconds since 2000-01-01 00:00, the game's DateTime. */
+/* Returns the milliseconds from 2000-01-01 00:00 to `d` 00:00: the game's
+ * DateTime. */
 uint64_t date_ms(Date d);
 
-/* A short reason for the screen (at most 22 characters), e.g. "no boss.sarc". */
+/* Returns a short reason for `s`, for the screen (at most 22 characters),
+ * e.g. "no boss.sarc". */
 const char *spotpass_status_str(SpotPassStatus s);
 
 #endif

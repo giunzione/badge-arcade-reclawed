@@ -67,6 +67,9 @@ typedef struct
 	bool too_big;
 } Buffer;
 
+/* curl write callback: appends the received bytes to the Buffer `user`.
+ * Returns fewer bytes than received (which stops curl) past the size limit
+ * or when memory runs out. */
 static size_t on_data(char *ptr, size_t size, size_t nmemb, void *user)
 {
 	Buffer *b = user;

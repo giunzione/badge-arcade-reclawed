@@ -53,7 +53,8 @@ static void copy_patch(void)
 	CHECK(fops_same_content(dst, IPS_B, sizeof(IPS_B) - 1));
 	CHECK(inst_write_patch(IPS_A, sizeof(IPS_A) - 1, dst, msg, sizeof(msg)) == INST_DONE);
 	CHECK(fops_same_content(dst, IPS_A, sizeof(IPS_A) - 1));
-	CHECK(inst_copy_patch(tmp_path(2, "inst/romfs/none.ips"), dst, msg, sizeof(msg)) == INST_FAILED);
+	CHECK(inst_copy_patch(tmp_path(2, "inst/romfs/none.ips"), dst, msg, sizeof(msg)) ==
+	      INST_FAILED);
 
 	/* NULL message buffer is allowed. */
 	CHECK(inst_copy_patch(src, dst, NULL, 0) == INST_ALREADY);

@@ -7,16 +7,19 @@
 #include "spotpass.h"
 #include "test.h"
 
+/* Writes `v` at `p` as a little-endian 16-bit value. */
 static void put16(unsigned char *p, unsigned v)
 {
 	p[0] = (unsigned char)v;
 	p[1] = (unsigned char)(v >> 8);
 }
 
-static void put32(unsigned char *p, unsigned long v)
+/* Writes `v` at `p` as a little-endian 32-bit value (the test archives are
+ * small: every offset fits). */
+static void put32(unsigned char *p, size_t v)
 {
 	put16(p, (unsigned)(v & 0xFFFF));
-	put16(p + 2, (unsigned)(v >> 16));
+	put16(p + 2, (unsigned)((v >> 16) & 0xFFFF));
 }
 
 /* A little-endian SARC with the given members, laid out as the game's:

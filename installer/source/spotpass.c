@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "bytes.h"
+
 /* SARC (little-endian, as Badge Arcade writes it):
  *   0x00 "SARC", 0x04 header size 0x14, 0x06 BOM FF FE, 0x08 file size,
  *   0x0C data offset, 0x10 version
@@ -14,23 +16,13 @@
  *        offset / 4), data start, data end (relative to the data offset)
  *   then "SFNT", 0x08, 0, and the zero-terminated names, 4-byte aligned. */
 
-static uint32_t get16(const unsigned char *p)
-{
-	return (uint32_t)p[0] | (uint32_t)p[1] << 8;
-}
-
-static uint32_t get32(const unsigned char *p)
-{
-	return get16(p) | get16(p + 2) << 16;
-}
-
 bool sarc_header_size(const unsigned char *b, size_t n, uint32_t *header_size)
 {
-	if (!b || n < SARC_HEADER_MIN || memcmp(b, "SARC", 4) != 0 || get16(b + 4) != 0x14 ||
+	if (!b || n < SARC_HEADER_MIN || memcmp(b, "SARC", 4) != 0 || le16(b + 4) != 0x14 ||
 	    b[6] != 0xFF || b[7] != 0xFE)
 		return false;
-	uint32_t data = get32(b + 0x0C);
-	if (data < 0x28 || data > SARC_HEADER_MAX || data > get32(b + 0x08))
+	uint32_t data = le32(b + 0x0C);
+	if (data < 0x28 || data > SARC_HEADER_MAX || data > le32(b + 0x08))
 		return false;
 	*header_size = data;
 	return true;
@@ -41,9 +33,9 @@ bool sarc_find(const unsigned char *hdr, size_t n, const char *name, uint32_t *s
 {
 	uint32_t data;
 	if (!sarc_header_size(hdr, n, &data) || n < data || memcmp(hdr + 0x14, "SFAT", 4) != 0 ||
-	    get16(hdr + 0x18) != 0x0C)
+	    le16(hdr + 0x18) != 0x0C)
 		return false;
-	uint32_t count = get16(hdr + 0x1A);
+	uint32_t count = le16(hdr + 0x1A);
 	size_t names = 0x20 + 16 * (size_t)count;
 	if (names + 8 > data || memcmp(hdr + names, "SFNT", 4) != 0)
 		return false;
@@ -53,13 +45,13 @@ bool sarc_find(const unsigned char *hdr, size_t n, const char *name, uint32_t *s
 	for (uint32_t i = 0; i < count; i++)
 	{
 		const unsigned char *node = hdr + 0x20 + 16 * (size_t)i;
-		uint32_t attr = get32(node + 4);
+		uint32_t attr = le32(node + 4);
 		if (!(attr & 0x01000000))
 			continue; /* member without a name */
 		size_t at = names + (size_t)(attr & 0xFFFFFF) * 4;
 		if (at + want + 1 > data || memcmp(hdr + at, name, want) != 0 || hdr[at + want] != '\0')
 			continue;
-		uint32_t s = get32(node + 8), e = get32(node + 12);
+		uint32_t s = le32(node + 8), e = le32(node + 12);
 		if (s > e || e > 0xFFFFFFFFu - data)
 			return false;
 		*start = data + s;
@@ -71,11 +63,13 @@ bool sarc_find(const unsigned char *hdr, size_t n, const char *name, uint32_t *s
 
 /* ---- dates ----------------------------------------------------------- */
 
+/* Returns true if `y` is a leap year (Gregorian). */
 static bool leap(int y)
 {
 	return (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
 }
 
+/* Returns the number of days of month `m` (1-12) of year `y`. */
 static int month_days(int y, int m)
 {
 	static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -151,6 +145,7 @@ static bool element(const char *from, const char *to, const char *tag, const cha
 	return true;
 }
 
+/* Returns true if the `len` characters at `text` are exactly `what`. */
 static bool is(const char *text, size_t len, const char *what)
 {
 	return len == strlen(what) && memcmp(text, what, len) == 0;

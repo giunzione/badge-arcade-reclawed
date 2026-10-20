@@ -18,7 +18,8 @@ static void sha256_vectors(void)
 	CHECK_STR(hex, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 	sha256_hex("abc", 3, hex);
 	CHECK_STR(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-	const char *two = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"; /* 56 bytes: two blocks */
+	/* 56 bytes: two blocks */
+	const char *two = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
 	sha256_hex(two, strlen(two), hex);
 	CHECK_STR(hex, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
 
@@ -133,7 +134,8 @@ static void manifest_hybrid_choice(void)
 	Manifest online, builtin;
 	CHECK(parse(GOOD, &online) == MANIFEST_OK);
 	CHECK(parse("reclawed-patches 1 v0.3.0\n"
-	            "0004000000153600 u5136 EUR patch-EUR-u5136.ips 3 " SHA_A "\n", &builtin) == MANIFEST_OK);
+	            "0004000000153600 u5136 EUR patch-EUR-u5136.ips 3 " SHA_A "\n",
+	            &builtin) == MANIFEST_OK);
 	const PatchEntry *e;
 	uint64_t eur = 0x0004000000153600ULL, usa = 0x0004000000153500ULL;
 

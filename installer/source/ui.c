@@ -128,6 +128,7 @@ static void round_rect(float x, float y, float w, float h, float r, u32 color)
 	C2D_DrawCircleSolid(x + w - r, y + h - r, 0.5f, r, color);
 }
 
+/* Returns the dot color for a check level. */
 static u32 level_color(CheckLevel level)
 {
 	switch (level)
@@ -142,6 +143,7 @@ static u32 level_color(CheckLevel level)
 
 /* ---- top screen ---------------------------------------------------- */
 
+/* Top screen: logo, app version, and one line per check. */
 static void draw_top(const CheckReport *r, const char *version)
 {
 	C2D_TargetClear(top_target, COL_BG);
@@ -194,6 +196,7 @@ static const char *const ITEM_LABELS[ITEM_COUNT] = {
 	[ITEM_CATALOG] = "Machines",
 };
 
+/* The status bar at the top of the bottom screen (one sentence). */
 static void draw_status(const CheckReport *r)
 {
 	const char *s;
@@ -234,6 +237,7 @@ static void draw_status(const CheckReport *r)
 	text_in_box(s, 0, 0, BOTTOM_W, 36, 0.6f, color);
 }
 
+/* One menu button; Install is the gold one, labelled Report / Update as needed. */
 static void draw_button(const CheckReport *r, const Menu *m, MenuItem item)
 {
 	MenuRect b = menu_item_rect(item);
@@ -250,12 +254,16 @@ static void draw_button(const CheckReport *r, const Menu *m, MenuItem item)
 
 	if (sel) /* selection ring */
 		round_rect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 9, primary ? COL_TEXT : COL_GOLD);
-	u32 fill = !on ? COL_PANEL_OFF : primary ? (sel ? COL_GOLD_HI : COL_GOLD) : sel ? COL_PANEL_HI : COL_PANEL;
+	u32 fill = !on      ? COL_PANEL_OFF
+	         : primary ? (sel ? COL_GOLD_HI : COL_GOLD)
+	         : sel     ? COL_PANEL_HI
+	                   : COL_PANEL;
 	round_rect(b.x, b.y, b.w, b.h, 7, fill);
 	text_in_box(label, b.x, b.y, b.w, b.h, 0.65f,
 	            !on ? COL_OFF : primary ? COL_INK : COL_TEXT);
 }
 
+/* The "Restart after install" checkbox row. */
 static void draw_toggle(const Menu *m)
 {
 	MenuRect b = menu_item_rect(ITEM_RESTART_AFTER);
@@ -293,6 +301,7 @@ static void draw_catalog(const CheckReport *r, const Menu *m)
 		     0.55f, on ? COL_GOLD_HI : COL_OFF, C2D_AlignRight);
 }
 
+/* One dialog button at `x` on the button row; `primary` is the gold one. */
 static void dialog_button(float x, const char *label, bool primary)
 {
 	round_rect(x, DLG_BTN_Y, DLG_BTN_W, DLG_BTN_H, 6, primary ? COL_GOLD : COL_PANEL_HI);
@@ -332,6 +341,7 @@ static void draw_qr(float x, float y, float box)
 		}
 }
 
+/* The report dialog: QR code to the pre-filled issue, and a close button. */
 static void draw_report(void)
 {
 	C2D_DrawRectSolid(0, 0, 0.5f, BOTTOM_W, SCREEN_H, COL_BG);
@@ -345,6 +355,7 @@ static void draw_report(void)
 	text_in_box("(B) Close", CLOSE_X, CLOSE_Y, CLOSE_W, CLOSE_H, 0.55f, COL_INK);
 }
 
+/* The open dialog: a confirmation, the report, or an action's result. */
 static void draw_dialog(const UiState *u)
 {
 	if (u->dialog == DIALOG_REPORT)
@@ -406,6 +417,7 @@ static void draw_dialog(const UiState *u)
 	}
 }
 
+/* Bottom screen: status bar, menu, help line, and the open dialog on top. */
 static void draw_bottom(const CheckReport *r, const Menu *m, const UiState *u)
 {
 	C2D_TargetClear(bottom_target, COL_BG);
@@ -438,7 +450,8 @@ void ui_draw(const CheckReport *r, const Menu *m, const UiState *u, const char *
 int ui_dialog_button_at(const UiState *u, int x, int y)
 {
 	if (u->dialog == DIALOG_REPORT)
-		return x >= CLOSE_X && x < CLOSE_X + CLOSE_W && y >= CLOSE_Y && y < CLOSE_Y + CLOSE_H ? 2 : 0;
+		return x >= CLOSE_X && x < CLOSE_X + CLOSE_W && y >= CLOSE_Y && y < CLOSE_Y + CLOSE_H
+		           ? 2 : 0;
 	if (u->dialog == DIALOG_NONE || y < DLG_BTN_Y || y >= DLG_BTN_Y + DLG_BTN_H)
 		return 0;
 	int left = DLG_X + 12, right = DLG_X + DLG_W - 12 - DLG_BTN_W;

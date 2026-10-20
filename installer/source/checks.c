@@ -13,6 +13,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "compiler.h"
+
+/* Appends a line of `level` to the report, printf-style. A CHECK_STOP line
+ * blocks the install. Lines past CHECK_MAX_ITEMS are dropped. */
+static void add(CheckReport *r, CheckLevel level, const char *fmt, ...) PRINTF_LIKE(3, 4);
 static void add(CheckReport *r, CheckLevel level, const char *fmt, ...)
 {
 	if (r->count >= CHECK_MAX_ITEMS)
@@ -44,6 +49,7 @@ static int pick_game(const SystemState *s)
 	return first;
 }
 
+/* Luma3DS: its version, or why the install can't trust it. */
 static void check_luma(const SystemState *s, CheckReport *r)
 {
 	if (!s->luma_detected)

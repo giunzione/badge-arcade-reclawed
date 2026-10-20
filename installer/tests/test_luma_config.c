@@ -96,7 +96,8 @@ static void keeps_crlf_and_spacing(void)
 
 static void skips_utf8_bom(void)
 {
-	const char *text = "\xEF\xBB\xBF[meta]\nconfig_version_major = 3\n[boot]\nenable_game_patching = 1\n";
+	const char *text = "\xEF\xBB\xBF[meta]\nconfig_version_major = 3\n"
+	                   "[boot]\nenable_game_patching = 1\n";
 	LumaCfgInfo info;
 	CHECK(parse(text, &info) == LUMACFG_OK);
 	CHECK(info.game_patching == 1);
@@ -104,7 +105,8 @@ static void skips_utf8_bom(void)
 
 static void accepts_colon_and_inline_comment(void)
 {
-	const char *text = "[meta]\nconfig_version_major : 3 ; note\n[boot]\nenable_game_patching : 0 ; off\n";
+	const char *text = "[meta]\nconfig_version_major : 3 ; note\n"
+	                   "[boot]\nenable_game_patching : 0 ; off\n";
 	LumaCfgInfo info;
 	CHECK(parse(text, &info) == LUMACFG_OK);
 	CHECK(info.version_major == 3 && info.game_patching == 0);
@@ -152,7 +154,8 @@ static void rejects_bad_values(void)
 	{
 		char text[128];
 		snprintf(text, sizeof(text),
-		         "[meta]\nconfig_version_major = 3\n[boot]\nenable_game_patching = %s\n", values[i]);
+		         "[meta]\nconfig_version_major = 3\n[boot]\nenable_game_patching = %s\n",
+		         values[i]);
 		LumaCfgInfo info;
 		CHECK(parse(text, &info) == LUMACFG_ERR_BAD_VALUE);
 	}

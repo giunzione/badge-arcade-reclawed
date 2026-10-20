@@ -1,0 +1,3 @@
+# For working on the repo (CI installs these too): pip install -r requirements-dev.txt
+-r requirements.txt
+ruff==0.17.1  # lint for the Python tools: ruff check . (rules in ruff.toml)
