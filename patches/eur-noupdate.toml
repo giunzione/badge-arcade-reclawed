@@ -36,8 +36,11 @@ code_title   = "base"         # no update installed: the base title runs
 code_version = 4096           # base title version
 
 [vars]
-plays       = 10           # free plays per crane visit (1-255)
-anchor_date = 2018-07-13   # first day of the week in your boss.sarc Schedule.xml <DateFrom>
+plays        = 10           # free plays per crane visit (1-255)
+anchor_date  = 2018-07-13   # default first day of the SpotPass week (boss.sarc Schedule.xml,
+                            # PrizeCollection <DateStartText>); the installer sets the real one
+catalog_mode = 0            # default machines: 0 = SpotPass week (boss.sarc), 1 = built-in
+                            # catalog (the game's RomFS); the installer sets the real one
 
 # ---------------------------------------------------------------------------
 # Title screen: boot without the network
@@ -157,6 +160,81 @@ asm         = "b #0x3d6bc0"
 description = "Jump to the HOME badge box (Y in the badge book): reload the HOME badge data first (cave)"
 
 # ---------------------------------------------------------------------------
+# Settings block, filled in by the installer app
+#
+# One patch for every console: the installer finds this block by its magic
+# ("RCLW" "CFG1") and writes the values for the console it installs on, before
+# saving code.ips (installer/source/ipscfg.h). The values below are only the
+# defaults, used when the patch is installed by hand.
+#   +0x00  "RCLW" "CFG1"   magic and format
+#   +0x08  anchor          first day of the SpotPass week, ms since 2000-01-01 (u64)
+#   +0x10  catalog mode    0 = SpotPass week (boss.sarc), 1 = built-in catalog
+# It lives in the zero padding at the end of .rodata (read-only, not code).
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x422220
+require_empty = true
+asm         = """
+    .word 0x574c4352          @ "RCLW"
+    .word 0x31474643          @ "CFG1"
+    .word ${anchor_ms_lo}
+    .word ${anchor_ms_hi}
+    .word ${catalog_mode}
+"""
+description = "Settings block: anchor ${anchor_date}, catalog mode ${catalog_mode} (defaults; the installer rewrites them)"
+
+# ---------------------------------------------------------------------------
+# Catalog mode 1: play the built-in machines, ignore boss.sarc
+#
+# Title state 0x26 (LoadingData) runs five jobs in order; status words at
+# scene +0x3FC/+0x400/+0x404/+0x408/+0x40C (0 idle, 1 running, 2 done, else
+# the SD-card error, state 0x1D). Each job's callback sets its own word:
+#   job 1 (+0x3FC) opens boss.sarc and allbadge.sarc in extdata as archives
+#         0 and 1; fails with 3 when they are missing
+#   job 2 (+0x400) main schedule, from archive 0 (empty if it isn't open)
+#   job 3 (+0x404) default schedule, from the RomFS
+#   job 4 (+0x408) prize catalog
+#   job 5 (+0x40C) SpotPass message flows named in the main schedule; fails
+#         with 3 when there are none
+# In mode 1 jobs 1 and 5 are marked done before they start. The game then
+# runs on its RomFS schedule and built-in catalog pc.sarc, as it does with no
+# SpotPass data; without allbadge.sarc the collection viewer may miss badges
+# that only came with SpotPass data. Mode 0 leaves everything as it was.
+# The hook replaces the first status read, so it runs on every frame of the
+# state; it only touches a status that is still 0.
+# ---------------------------------------------------------------------------
+
+[[patch]]
+address     = 0x33F14C
+original    = "ldr r0, [r4, #0x3fc]"
+asm         = "bl #0x153bc0"
+description = "LoadingData: in catalog mode 1, skip the two boss.sarc jobs (dead-function cave)"
+
+[[patch]]
+address     = 0x153BC0
+dead_code   = { size = 1280, sha256 = "8163cf8099285e01e6b7a9300bc96caf4b1c17dde9e650331aef413d7a989e4d" }
+asm         = """
+    ldr r0, p_cfg
+    ldr r0, [r0, #0x10]       @ catalog mode
+    cmp r0, #1
+    bne done
+    ldr r0, [r4, #0x3fc]      @ job 1: open boss.sarc / allbadge.sarc
+    cmp r0, #0
+    moveq r0, #2
+    streq r0, [r4, #0x3fc]
+    ldr r0, [r4, #0x40c]      @ job 5: SpotPass message flows
+    cmp r0, #0
+    moveq r0, #2
+    streq r0, [r4, #0x40c]
+done:
+    ldr r0, [r4, #0x3fc]      @ replaced instruction
+    bx lr
+p_cfg: .word 0x422220         @ settings block
+"""
+description = "Catalog-mode cave (over an unused SDK worker function, 1,280 B)"
+
+# ---------------------------------------------------------------------------
 # Clock remap
 # 0x2AF858 reads the RTC as ms since 2000-01-01. Its final store is redirected to
 # a cave in the .text padding that folds the time into the cached week:
@@ -173,8 +251,9 @@ description = "Root clock 0x2AF858: redirect final store to the remap cave"
 address     = 0x3D6B40
 require_empty = true
 asm         = """
-    ldr r2, anc_lo
-    ldr r3, anc_hi
+    ldr ip, p_cfg
+    ldr r2, [ip, #8]         @ ANCHOR from the settings block
+    ldr r3, [ip, #12]
     subs r0, r0, r2          @ d = t - ANCHOR (64-bit)
     sbc r1, r1, r3
     ldr ip, week
@@ -199,11 +278,10 @@ done:                        @ t' = ANCHOR + d, then the original epilogue
     strd r0, r1, [r4]
     add sp, sp, #0x14
     pop {r4, r5, pc}
-anc_lo: .word ${anchor_ms_lo}
-anc_hi: .word ${anchor_ms_hi}
+p_cfg:  .word 0x422220        @ settings block
 week:   .word ${week_ms}
 """
-description = "Clock remap cave (in .text padding), anchor ${anchor_date}"
+description = "Clock remap cave (in .text padding), anchor from the settings block"
 
 # ---------------------------------------------------------------------------
 # Local persistence of won badges

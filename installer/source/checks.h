@@ -11,9 +11,11 @@
 #include <stdbool.h>
 
 #include "installed.h" /* PatchState: the code.ips on the SD vs the chosen patch */
+#include "ipscfg.h"    /* CatalogMode: the settings written into the patch */
 #include "luma_config.h"
 #include "manifest.h"
 #include "net.h"
+#include "spotpass.h"
 #include "titles.h"
 
 typedef enum
@@ -42,6 +44,10 @@ typedef struct
 	NetStatus online_error;   /* when ONLINE_FAILED */
 	char builtin_release[32]; /* release the app's own patches come from ("" if none) */
 
+	/* The user's choice in the menu: the built-in machines even when
+	 * boss.sarc is usable. Set by main.c before probe_resolve(). */
+	bool want_builtin;
+
 	/* One entry per GAME_TITLES row */
 	struct
 	{
@@ -60,8 +66,18 @@ typedef struct
 		char patch_release[32];
 		PatchState sd_patch;      /* the code.ips on the SD vs the chosen patch (installed.h) */
 		char sd_release[32];      /* release of the app's own patch on the SD, from its record ("" if unknown) */
+		int sd_catalog;           /* catalog mode in the code.ips on the SD, -1 if none / no settings block */
+
+		/* boss.sarc in the game's extdata, and what the chosen patch was set to */
+		SpotPassWeek spotpass;
+		bool settings_ok;         /* the chosen patch has a settings block (ipscfg.h) */
+		CatalogMode catalog;      /* the machines it will use (checks_catalog()) */
 	} game[GAME_TITLE_COUNT];
 } SystemState;
+
+/* Which machines to install the patch with: the SpotPass week when
+ * boss.sarc is usable and the user didn't pick the built-in ones. */
+CatalogMode checks_catalog(const SpotPassWeek *week, bool want_builtin);
 
 typedef enum
 {
@@ -93,6 +109,8 @@ typedef struct
 	bool update_available; /* the target's patch on the SD is ours, from an older release */
 	bool keep_sd_patch;    /* ours from a newer release: Install must not overwrite it */
 	bool confirm_replace;  /* a code.ips the app didn't write: ask before replacing it */
+	bool catalog_choice;   /* boss.sarc is usable: the user may switch to the built-in machines */
+	bool catalog_builtin;  /* the target's patch will use the built-in machines */
 } CheckReport;
 
 void checks_run(const SystemState *s, CheckReport *out);

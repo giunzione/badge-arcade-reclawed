@@ -26,14 +26,24 @@ Every entry has a date range. Outside it, nothing shows up. With the clock set t
 The final store of `0x2B0300` is redirected to a cave that maps any time into the cached week, keeping the weekday and the time of day:
 
 ```
-ANCHOR = 2018-07-13 00:00   (a Friday, start of the cached week)
+ANCHOR = first day of the cached week, 00:00   (e.g. 2018-07-13, a Friday)
 WEEK   = 604 800 000 ms
 t' = ANCHOR + ((t − ANCHOR) mod WEEK)
 ```
 
 The ARM11 has no hardware divide, so the modulo is done by repeated subtraction: at most a few hundred iterations for current dates.
 
-The anchor is hard-coded for the week found on the author's console. If your `boss.sarc` covers a different week, the anchor has to change: read `DateFrom` in your `Schedule.xml`.
+### Which week: set per console
+
+Every console has the week it last downloaded, so the anchor can't be a constant. The cave reads it from the patch's **settings block** (patch 16), and the installer app writes the console's own week there before it saves `code.ips`:
+
+1. It opens the game's SD extdata (EUR `0x1536`, USA `0x1535`) and reads `boss.sarc`'s header and its `Schedule.xml`, not the whole 25 MB archive.
+2. The week's first day is the `<DateStartText>` of the `PrizeCollection` entry. Without one, it's the earliest `DefaultStage` start.
+3. It counts the `DefaultStage` entries in the 7 days from there. The two dumps checked so far both have 30 machines a day, every day: EUR `2018-07-13`, USA `2019-01-10`.
+
+The values in the release's `code.ips` are only defaults (EUR `2018-07-13`, USA `2019-01-10`, from `anchor_date` in each TOML). A patch copied by hand uses them; rebuild with `--set anchor_date=YYYY-MM-DD` if your week is another one.
+
+Without a usable `boss.sarc`, the installer sets the patch to the game's built-in machines instead (catalog mode 1, [02 – Boot sequence](02-boot-sequence.md#catalog-mode)). Their schedule runs from 2000 to 2030, so the folded clock always falls inside it.
 
 ### Side effects
 

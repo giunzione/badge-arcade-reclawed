@@ -42,12 +42,14 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | 9 | `0x2E1490` | `bl` cave | Crane: end-of-session save exports won badges to the HOME Menu, *pending* until they are written |
 | 10 | `0x305640` | `mov r0,#1` | Practice Catcher: result save returns *success* |
 | 10b | `0x3125A0` | `bl` cave | Tutorial crane (first play): end-of-session save, same as patch 9 |
-| 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule |
+| 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule (anchor from patch 16) |
 | 12 | `0x2CDDB4` → `0x3D7A20` | call + cave | After each `savedata` write, save the progress blob to `extdata:/reclawed` |
 | 13 | (in the caves of 9, 10b and the boot load) | | Leave *new player* mode (network mode 0) once the player owns a badge |
 | 14 | `0x33F7CC`, `0x2D6398` → cave | branch / call | Load the saved badges once per boot: at title state `0x28`, or at hall entry if the boot skipped `0x28` |
 | 15 | `0x25163C` → cave | branch | HOME badge box from the game (Y in the badge book): reload the HOME badge data first, as the in-game badge box does |
+| 16 | `0x4237A0` | 20-byte data block | Settings, written by the installer for each console: first day of the SpotPass week, catalog mode |
+| 17 | `0x33F60C` → `0x153BC0` | call + cave | Catalog mode 1: skip the two `boss.sarc` loading jobs, so the game plays its built-in machines |
 
-Patch 11's and 12's caves live in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable.
+Patch 11's and 12's caves live in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable. Patch 16 is in the zero padding at the end of `.rodata` (read-only). Patch 17's cave replaces an SDK worker function the game never runs (checked by SHA-256, see `dead_code` in the TOMLs).
 
 Details for each are on the following pages.

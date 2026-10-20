@@ -22,6 +22,14 @@ static void set_game(SystemState *s, int i, unsigned version, PatchSource source
 	snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
 	         source == SOURCE_ONLINE ? "v0.4.1" : source == SOURCE_BUILTIN ? "v0.4.0" : "");
 	s->game[i].sd_patch = PATCH_NOT_ON_SD;
+	s->game[i].sd_catalog = -1;
+	/* boss.sarc with a full week; the patch has a settings block. */
+	s->game[i].spotpass.status = SPOTPASS_OK;
+	s->game[i].spotpass.first_day = (Date){2018, 7, 13};
+	s->game[i].spotpass.days = 7;
+	s->game[i].spotpass.machines = 210;
+	s->game[i].settings_ok = source != SOURCE_NONE;
+	s->game[i].catalog = CATALOG_SPOTPASS;
 }
 
 /* A console ready for a first install: Luma on the SD, game patching off,
@@ -73,8 +81,68 @@ static void first_install(void)
 	CHECK(has(&r, CHECK_OK, "Luma3DS v13.3.2"));
 	CHECK(has(&r, CHECK_OK, "Badge Arcade EUR v1.3.1"));
 	CHECK(has(&r, CHECK_OK, "Patch from v0.4.1 (online)"));
+	CHECK(has(&r, CHECK_OK, "SpotPass week from 2018-07-13"));
 	CHECK(has(&r, CHECK_INFO, "Patch will be installed"));
 	CHECK(has(&r, CHECK_INFO, "Game patching will be enabled"));
+	CHECK(r.catalog_choice && !r.catalog_builtin);
+}
+
+/* Which machines the patch will use, from boss.sarc and the user's choice. */
+static void catalog_lines(void)
+{
+	SystemState s = ready();
+	CheckReport r;
+
+	/* The decision itself. */
+	SpotPassWeek w = s.game[EUR].spotpass;
+	CHECK(checks_catalog(&w, false) == CATALOG_SPOTPASS);
+	CHECK(checks_catalog(&w, true) == CATALOG_BUILTIN);
+	w.status = SPOTPASS_MISSING;
+	CHECK(checks_catalog(&w, false) == CATALOG_BUILTIN);
+	w.status = SPOTPASS_NO_MACHINES;
+	CHECK(checks_catalog(&w, false) == CATALOG_BUILTIN);
+
+	/* The user picked the built-in machines although boss.sarc is fine. */
+	s.game[EUR].catalog = CATALOG_BUILTIN;
+	checks_run(&s, &r);
+	CHECK(r.can_install && r.catalog_choice && r.catalog_builtin);
+	CHECK(has(&r, CHECK_INFO, "Built-in machines (your choice)"));
+
+	/* No boss.sarc: built-in, no choice, still installable. */
+	s.game[EUR].spotpass.status = SPOTPASS_MISSING;
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.catalog_choice && r.catalog_builtin);
+	CHECK(has(&r, CHECK_INFO, "No SpotPass data: built-in machines"));
+	CHECK(count_level(&r, CHECK_WARN) == 0);
+
+	/* A boss.sarc the app can't use: a warning, then the same. */
+	s.game[EUR].spotpass.status = SPOTPASS_NOT_SARC;
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.catalog_choice);
+	CHECK(has(&r, CHECK_WARN, "boss.sarc damaged: built-in machines"));
+
+	/* A short week (some days without machines). */
+	s = ready();
+	s.game[EUR].spotpass.days = 5;
+	checks_run(&s, &r);
+	CHECK(r.can_install);
+	CHECK(has(&r, CHECK_WARN, "SpotPass week 2018-07-13 (5 days only)"));
+
+	/* A patch from before the settings block (e.g. an old online release). */
+	s = ready();
+	s.game[EUR].settings_ok = false;
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.catalog_choice);
+	CHECK(has(&r, CHECK_WARN, "Old patch: SpotPass week can't be set"));
+
+	/* No patch at all: no machines line. */
+	s = ready();
+	s.game[EUR].source = SOURCE_NONE;
+	s.game[EUR].fetch = FETCH_NOT_LISTED;
+	checks_run(&s, &r);
+	CHECK(!r.catalog_choice);
+	for (int i = 0; i < r.count; i++)
+		CHECK(strstr(r.items[i].text, "SpotPass") == NULL);
 }
 
 static void already_installed(void)
@@ -148,6 +216,14 @@ static void sd_patch_states(void)
 	checks_run(&s, &r);
 	CHECK(r.can_install && !r.nothing_to_do && r.confirm_replace && !r.update_available);
 	CHECK(has(&r, CHECK_WARN, "Unknown patch on SD (asks to replace)"));
+
+	/* The same patch, written for another week or catalog: rewritten, no
+	 * question asked, not called an update. */
+	s.game[EUR].sd_patch = PATCH_SETTINGS;
+	checks_run(&s, &r);
+	CHECK(r.can_install && !r.nothing_to_do && !r.confirm_replace && !r.update_available);
+	CHECK(!r.keep_sd_patch);
+	CHECK(has(&r, CHECK_INFO, "Patch settings will change"));
 }
 
 static void online_states(void)
@@ -353,6 +429,21 @@ static void lines_fit_the_screen(void)
 			for (int i = 0; i < r.count; i++)
 				CHECK(strlen(r.items[i].text) < CHECK_TEXT_LEN - 1);
 		}
+
+	/* Every machines line, with the longest dates. */
+	for (int sp = SPOTPASS_OK; sp <= SPOTPASS_NO_MACHINES; sp++)
+		for (int builtin = 0; builtin < 2; builtin++)
+		{
+			SystemState s = ready();
+			s.game[EUR].spotpass.status = (SpotPassStatus)sp;
+			s.game[EUR].spotpass.first_day = (Date){2099, 12, 31};
+			s.game[EUR].spotpass.days = sp == SPOTPASS_OK ? 6 : 0;
+			s.game[EUR].catalog = builtin || sp != SPOTPASS_OK ? CATALOG_BUILTIN : CATALOG_SPOTPASS;
+			CheckReport r;
+			checks_run(&s, &r);
+			for (int i = 0; i < r.count; i++)
+				CHECK(strlen(r.items[i].text) < CHECK_TEXT_LEN - 1);
+		}
 }
 
 static void uninstall_target(void)
@@ -398,6 +489,7 @@ static void titles_lookup(void)
 void test_checks_run(void)
 {
 	first_install();
+	catalog_lines();
 	already_installed();
 	sd_patch_states();
 	online_states();

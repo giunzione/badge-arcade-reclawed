@@ -2,7 +2,8 @@
  * checks - see checks.h.
  *
  * Order of the lines on screen: Luma3DS, the game and its version, where the
- * patch comes from, the patch on the SD, the Luma config. A CHECK_STOP
+ * patch comes from, which machines it will use, the patch on the SD, the
+ * Luma config. A CHECK_STOP
  * anywhere blocks the install; the remaining lines are still shown so the
  * user sees everything at once.
  */
@@ -120,6 +121,41 @@ static bool check_source(const SystemState *s, int t, CheckReport *r)
 	return false;
 }
 
+CatalogMode checks_catalog(const SpotPassWeek *week, bool want_builtin)
+{
+	return week->status == SPOTPASS_OK && !want_builtin ? CATALOG_SPOTPASS : CATALOG_BUILTIN;
+}
+
+/* Which machines the patch will use: the SpotPass week cached in boss.sarc
+ * (the clock is folded into it), or the game's built-in catalog. */
+static void check_catalog(const SystemState *s, int t, CheckReport *r)
+{
+	const SpotPassWeek *w = &s->game[t].spotpass;
+	if (!s->game[t].settings_ok)
+	{
+		/* A patch from before the settings block: its week is fixed. */
+		add(r, CHECK_WARN, "Old patch: SpotPass week can't be set");
+		return;
+	}
+	r->catalog_choice = w->status == SPOTPASS_OK;
+	r->catalog_builtin = s->game[t].catalog == CATALOG_BUILTIN;
+	if (!r->catalog_builtin)
+	{
+		const Date *d = &w->first_day;
+		if (w->days < 7)
+			add(r, CHECK_WARN, "SpotPass week %04d-%02d-%02d (%d days only)", d->year, d->month,
+			    d->day, w->days);
+		else
+			add(r, CHECK_OK, "SpotPass week from %04d-%02d-%02d", d->year, d->month, d->day);
+	}
+	else if (w->status == SPOTPASS_OK)
+		add(r, CHECK_INFO, "Built-in machines (your choice)");
+	else if (w->status == SPOTPASS_MISSING)
+		add(r, CHECK_INFO, "No SpotPass data: built-in machines");
+	else
+		add(r, CHECK_WARN, "%s: built-in machines", spotpass_status_str(w->status));
+}
+
 /* The code.ips on the SD vs the chosen patch (installed.h). Returns true if
  * Install has to write the patch. */
 static bool check_sd_patch(const SystemState *s, int t, CheckReport *r)
@@ -147,6 +183,9 @@ static bool check_sd_patch(const SystemState *s, int t, CheckReport *r)
 		return true;
 	case PATCH_OTHER_VERSION:
 		add(r, CHECK_WARN, "Patch for another game version on SD");
+		return true;
+	case PATCH_SETTINGS:
+		add(r, CHECK_INFO, "Patch settings will change");
 		return true;
 	case PATCH_FOREIGN:
 		/* Custom build, manual copy or edited: the record doesn't vouch for it. */
@@ -202,6 +241,7 @@ void checks_run(const SystemState *s, CheckReport *out)
 		if (have_patch)
 		{
 			out->target = t;
+			check_catalog(s, t, out);
 			patch_needed = check_sd_patch(s, t, out);
 		}
 	}

@@ -191,6 +191,7 @@ static const char *const ITEM_LABELS[ITEM_COUNT] = {
 	[ITEM_RESTART] = "Restart",
 	[ITEM_EXIT] = "Exit",
 	[ITEM_RESTART_AFTER] = "Restart after install",
+	[ITEM_CATALOG] = "Machines",
 };
 
 static void draw_status(const CheckReport *r)
@@ -272,7 +273,24 @@ static void draw_toggle(const Menu *m)
 	if (m->restart_after_install)
 		C2D_DrawRectSolid(cx + 4, cy + 4, 0.5f, 8, 8, on ? COL_GOLD_HI : COL_OFF);
 
-	text(ITEM_LABELS[ITEM_RESTART_AFTER], cx + 26, b.y + 7, 0.55f, on ? COL_TEXT : COL_OFF, 0);
+	text(ITEM_LABELS[ITEM_RESTART_AFTER], cx + 26, b.y + 5, 0.55f, on ? COL_TEXT : COL_OFF, 0);
+}
+
+/* "Machines" with the current choice on the right; (A) switches it. Shows
+ * what the patch will use even when there is no choice (no boss.sarc). */
+static void draw_catalog(const CheckReport *r, const Menu *m)
+{
+	MenuRect b = menu_item_rect(ITEM_CATALOG);
+	bool on = m->enabled[ITEM_CATALOG];
+	bool sel = on && m->selected == ITEM_CATALOG;
+
+	if (sel)
+		round_rect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 8, COL_GOLD);
+	round_rect(b.x, b.y, b.w, b.h, 6, on ? (sel ? COL_PANEL_HI : COL_PANEL) : COL_PANEL_OFF);
+	text(ITEM_LABELS[ITEM_CATALOG], b.x + 10, b.y + 5, 0.55f, on ? COL_TEXT : COL_OFF, 0);
+	if (r->target >= 0)
+		text(r->catalog_builtin ? "< Built-in >" : "< SpotPass week >", b.x + b.w - 10, b.y + 5,
+		     0.55f, on ? COL_GOLD_HI : COL_OFF, C2D_AlignRight);
 }
 
 static void dialog_button(float x, const char *label, bool primary)
@@ -399,6 +417,7 @@ static void draw_bottom(const CheckReport *r, const Menu *m, const UiState *u)
 	draw_button(r, m, ITEM_RESTART);
 	draw_button(r, m, ITEM_EXIT);
 	draw_toggle(m);
+	draw_catalog(r, m);
 	text("D-Pad / touch: choose    (A) select    START: exit", BOTTOM_W / 2.0f, 222, 0.4f,
 	     COL_DIM, C2D_AlignCenter);
 

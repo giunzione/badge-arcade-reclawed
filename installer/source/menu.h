@@ -10,6 +10,7 @@
  *     [ Install   ] [ Uninstall ]     row 0
  *     [ Restart   ] [ Exit      ]     row 1
  *     [ x Restart after install ]     row 2 (one item, both columns)
+ *     [ Machines: SpotPass week ]     row 3 (one item: SpotPass week / built-in)
  */
 #ifndef MENU_H
 #define MENU_H
@@ -25,6 +26,7 @@ typedef enum
 	ITEM_RESTART,
 	ITEM_EXIT,
 	ITEM_RESTART_AFTER, /* toggle */
+	ITEM_CATALOG,       /* toggle: SpotPass week / built-in machines */
 	ITEM_COUNT,
 	ITEM_NONE = -1,
 } MenuItem;
@@ -34,6 +36,8 @@ typedef struct
 	bool enabled[ITEM_COUNT];
 	MenuItem selected;
 	bool restart_after_install; /* state of the toggle */
+	bool builtin_catalog;       /* the user picked the built-in machines over the
+	                             * SpotPass week (only offered when boss.sarc is usable) */
 	bool left_install;          /* selection moved off Install only because it was
 	                             * disabled (e.g. during the online check) */
 } Menu;
@@ -48,7 +52,8 @@ void menu_init(Menu *m);
 
 /* Enable items from the checks: Install when there is something to install
  * (or, labelled "Report", when the game's version has no patch), Uninstall
- * when a patch is on the SD, Restart when the console can restart.
+ * when a patch is on the SD, Restart when the console can restart, Machines
+ * when there is a choice (boss.sarc is usable).
  * Moves the selection off a disabled item, and back to Install when it was
  * only moved off it because Install was disabled for a while (the user
  * hasn't picked something else since). */

@@ -13,8 +13,10 @@
 #include <3ds.h>
 
 #include "fileops.h"
+#include "ipscfg.h"
 #include "luma_config.h"
 #include "luma_system.h"
+#include "spotpass.h"
 
 /* The app's own patches (RomFS), loaded once. */
 static Manifest builtin;
@@ -102,6 +104,72 @@ static void probe_luma(SystemState *s)
 	}
 }
 
+/* Read `len` bytes at `offset` of an open file; true if all of them came. */
+static bool read_at(Handle f, u64 offset, void *buf, u32 len)
+{
+	u32 got = 0;
+	return R_SUCCEEDED(FSFILE_Read(f, &got, offset, buf, len)) && got == len;
+}
+
+/* "Not found" from FS: the generic description, or FS's own not-found range
+ * (descriptions 100-179). Any other failure (e.g. access denied) must not
+ * pass for "no boss.sarc", or the user would silently lose the SpotPass week. */
+static bool not_found(Result r)
+{
+	u32 d = R_DESCRIPTION(r);
+	return d == RD_NOT_FOUND || (d >= 100 && d < 180);
+}
+
+/* Which SpotPass week the game's extdata holds: boss.sarc's Schedule.xml,
+ * read in place (the archive is ~25 MB; only its header and that file are
+ * read). */
+static void probe_spotpass(SpotPassWeek *w, u32 extdata_id)
+{
+	u32 path[3] = {MEDIATYPE_SD, extdata_id, 0};
+	FS_Archive arch;
+	Result r = FSUSER_OpenArchive(&arch, ARCHIVE_EXTDATA, (FS_Path){PATH_BINARY, sizeof(path), path});
+	if (R_FAILED(r))
+	{
+		w->status = not_found(r) ? SPOTPASS_MISSING : SPOTPASS_UNREADABLE;
+		return;
+	}
+	Handle f;
+	r = FSUSER_OpenFile(&f, arch, fsMakePath(PATH_ASCII, SPOTPASS_FILE), FS_OPEN_READ, 0);
+	if (R_FAILED(r))
+	{
+		w->status = not_found(r) ? SPOTPASS_MISSING : SPOTPASS_UNREADABLE;
+		FSUSER_CloseArchive(arch);
+		return;
+	}
+
+	unsigned char head[SARC_HEADER_MIN], *hdr = NULL;
+	char *xml = NULL;
+	u64 file_size = 0;
+	uint32_t hdr_size, start, end;
+	w->status = SPOTPASS_UNREADABLE;
+	if (R_FAILED(FSFILE_GetSize(f, &file_size)) || !read_at(f, 0, head, sizeof(head)))
+		goto done;
+	w->status = SPOTPASS_NOT_SARC;
+	if (!sarc_header_size(head, sizeof(head), &hdr_size) || hdr_size > file_size ||
+	    !(hdr = malloc(hdr_size)))
+		goto done;
+	w->status = SPOTPASS_UNREADABLE;
+	if (!read_at(f, 0, hdr, hdr_size))
+		goto done;
+	w->status = SPOTPASS_NO_SCHEDULE;
+	if (!sarc_find(hdr, hdr_size, SPOTPASS_SCHEDULE, &start, &end) || end > file_size ||
+	    end - start > SCHEDULE_MAX_SIZE || !(xml = malloc(end - start ? end - start : 1)))
+		goto done;
+	w->status = SPOTPASS_UNREADABLE;
+	if (read_at(f, start, xml, end - start))
+		schedule_week(xml, end - start, w); /* OK or NO_MACHINES */
+done:
+	free(xml);
+	free(hdr);
+	FSFILE_Close(f);
+	FSUSER_CloseArchive(arch);
+}
+
 static void probe_game(SystemState *s, int i)
 {
 	s->game[i].installed = title_version(GAME_TITLES[i].base_tid, &s->game[i].base_version);
@@ -122,6 +190,10 @@ static void probe_game(SystemState *s, int i)
 		s->game[i].update_version = RECLAWED_FAKE_VERSION;
 	}
 #endif
+
+	s->game[i].spotpass.status = SPOTPASS_MISSING;
+	if (s->game[i].installed)
+		probe_spotpass(&s->game[i].spotpass, GAME_TITLES[i].extdata_id);
 
 	/* The update's code runs whenever the update is installed. */
 	if (s->game[i].update_installed)
@@ -202,6 +274,55 @@ static void choose_patch(SystemState *s, OnlineJob *job, int i)
 	s->game[i].source = src;
 }
 
+/* The settings for game `i` (ipscfg.h): the catalog mode from the checks,
+ * and the first day of the SpotPass week when boss.sarc has one; otherwise
+ * the anchor stays as in `base` (the patch's default, unused in built-in
+ * mode anyway). */
+static IpsSettings wanted_settings(const SystemState *s, int i, const IpsSettings *base)
+{
+	IpsSettings w = *base;
+	const SpotPassWeek *week = &s->game[i].spotpass;
+	w.mode = checks_catalog(week, s->want_builtin);
+	if (week->status == SPOTPASS_OK)
+		w.anchor_ms = date_ms(week->first_day);
+	return w;
+}
+
+static bool same_settings(const IpsSettings *a, const IpsSettings *b)
+{
+	return a->anchor_ms == b->anchor_ms && a->mode == b->mode;
+}
+
+/* Replace the chosen patch with a copy of `data` written with the settings
+ * for this console: that copy is what Install saves, and what the SD is
+ * compared with. */
+static void set_chosen_with_settings(SystemState *s, int i, const unsigned char *data, size_t size)
+{
+	unsigned char *copy = malloc(size ? size : 1);
+	if (copy)
+		memcpy(copy, data, size);
+	free(chosen[i].owned);
+	chosen[i].owned = copy;
+	chosen[i].data = copy;
+	chosen[i].size = copy ? size : 0;
+	if (!copy)
+	{
+		s->game[i].source = SOURCE_NONE;
+		return;
+	}
+
+	IpsSettings base, want;
+	s->game[i].settings_ok = ipscfg_read(copy, size, &base);
+	if (!s->game[i].settings_ok)
+	{
+		s->game[i].catalog = CATALOG_SPOTPASS; /* old patch: always the boss.sarc week */
+		return;
+	}
+	want = wanted_settings(s, i, &base);
+	ipscfg_write(copy, size, &want);
+	s->game[i].catalog = (CatalogMode)want.mode;
+}
+
 /* Compare the code.ips on the SD with the chosen patch, using the record the
  * app left next to it (installed.h). */
 static void classify_sd_patch(SystemState *s, int i, const char *sd_path)
@@ -226,6 +347,32 @@ static void classify_sd_patch(SystemState *s, int i, const char *sd_path)
 	                                         s->game[i].code_version);
 	if (have_rec && strcmp(rec.sha256, sd_hex) == 0)
 		snprintf(s->game[i].sd_release, sizeof(s->game[i].sd_release), "%s", rec.release);
+
+	IpsSettings sd_set;
+	bool sd_has_settings = sd && ipscfg_read(sd, sd_size, &sd_set);
+	s->game[i].sd_catalog = sd_has_settings ? (int)sd_set.mode : -1;
+	PatchState st = s->game[i].sd_patch;
+	if (st != PATCH_SAME && st != PATCH_NOT_ON_SD && chosen[i].data &&
+	    ipscfg_same_except_settings(sd, sd_size, chosen[i].data, chosen[i].size))
+	{
+		/* Our very patch, written for another week or catalog mode. */
+		s->game[i].sd_patch = PATCH_SETTINGS;
+	}
+	else if (st == PATCH_NEWER && sd_has_settings && s->game[i].source != SOURCE_NONE)
+	{
+		/* Install keeps a newer patch of ours; its settings still follow
+		 * this console (e.g. the user switched the catalog). */
+		IpsSettings want = wanted_settings(s, i, &sd_set);
+		if (!same_settings(&want, &sd_set))
+		{
+			set_chosen_with_settings(s, i, sd, sd_size);
+			snprintf(s->game[i].patch_release, sizeof(s->game[i].patch_release), "%s",
+			         s->game[i].sd_release);
+			s->game[i].sd_patch = PATCH_SETTINGS;
+		}
+		else
+			s->game[i].catalog = (CatalogMode)sd_set.mode;
+	}
 	free(sd);
 	free(text);
 }
@@ -252,8 +399,12 @@ void probe_resolve(SystemState *s, OnlineJob *job)
 		s->game[i].fetch = done && job->manifest_ok ? job->got[i].result : FETCH_NOT_TRIED;
 		s->game[i].patch_release[0] = '\0';
 		s->game[i].sd_release[0] = '\0';
+		s->game[i].settings_ok = false;
+		s->game[i].catalog = CATALOG_SPOTPASS;
 		if (s->game[i].installed && done)
 			choose_patch(s, job, i);
+		if (chosen[i].data)
+			set_chosen_with_settings(s, i, chosen[i].data, chosen[i].size);
 		classify_sd_patch(s, i, sd_path);
 	}
 }

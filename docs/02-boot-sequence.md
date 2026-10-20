@@ -35,6 +35,29 @@ Error dialogues by state: `0x07` Start_Disconnected, `0x08` Start_DisableWireles
 
 Every state touching the network is skipped. The local-only states that build the HOME badge data (`0x33`–`0x36`) are kept.
 
+## LoadingData and the catalog mode
+
+*LoadingData* (`0x26`, `0x33F5A4`) runs five jobs one after the other. Their status words are at scene `+0x3FC`, `+0x400`, `+0x404`, `+0x408` and `+0x40C` (0 idle, 1 running, 2 done, anything else → state `0x1D`, the SD-card error). Each job's callback sets its own word:
+
+| Job | Callback | What it does |
+|---|---|---|
+| 1 (`+0x3FC`) | `0x3423A0` | opens `boss.sarc` and `allbadge.sarc` from extdata as archives 0 and 1. Fails with **3** when they're missing |
+| 2 (`+0x400`) | `0x3428BC` | main schedule, `0x24DD70(gGameData[+0x719F8], …, archive 0)`: `boss.sarc`'s `Schedule.xml` (empty if archive 0 isn't open) |
+| 3 (`+0x404`) | `0x3429CC` | default schedule, same with archive 5 (RomFS) into `gGameData[+0x719FC]`: valid 2000–2030, 30 built-in machines |
+| 4 (`+0x408`) | `0x3432CC` | prize catalog setup `0x248038` (the machines' resources) |
+| 5 (`+0x40C`) | `0x341940` | the message flows named in the main schedule (`Boss/StartUp.msflow`, …). Fails with **3** when there are none |
+
+Jobs 1 and 5 are why a console without `boss.sarc` stops at the SD-card error.
+
+The installer writes a **catalog mode** into the patch (settings block, patch 16):
+
+- **0, SpotPass week** (default when `boss.sarc` is usable): nothing changes, and the game plays the cached week with the clock remapped to it ([04 – Time](04-time.md)).
+- **1, built-in**: patch 17 replaces the first status read in *LoadingData* (`ldr r0, [r4, #0x3fc]` at `0x33F60C`) with a call to a cave. While a status is still 0, the cave marks jobs 1 and 5 as done. Archives 0 and 1 then stay closed and the main schedule stays empty, so the game runs on the default schedule and the built-in catalog `pc.sarc`. That's the same as a console that never downloaded SpotPass data. [badge-arcade-offline](https://github.com/GrouchoGlasses42/badge-arcade-offline) sets the same two status words in its own start-up code.
+
+Side effect: without `allbadge.sarc`, the collection viewer may not show badges that only came with SpotPass data. Their ownership stays in the save.
+
+The cave runs on every frame of the state and only touches a status that is still 0, so mode 0 behaves exactly as before. Not verified: a reload path, `0x240864` (callers `0x300904`, `0x30EA64`), reads both schedules again from archives 0 and 5. It's gated by the same extdata file check as job 1 (`0x26FCE0`), and offline it hasn't been seen running.
+
 ## Notes
 
 - `0x2A` and the `ServiceClosed` scene are a built-in "arcade closed" mode with only the badge box, still reachable in the code. The decision uses a sum of owned-badge counts (`0x239E44` on `[0x42BE68] + 0x71A54`).

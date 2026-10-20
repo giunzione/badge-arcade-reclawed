@@ -35,6 +35,8 @@ void test_checks_run(void);
 void test_menu(void);
 void test_manifest(void);
 void test_installed(void);
+void test_ipscfg(void);
+void test_spotpass(void);
 
 /* Build "<test_tmp><name>" into a static buffer (one at a time per slot). */
 const char *tmp_path(int slot, const char *name);

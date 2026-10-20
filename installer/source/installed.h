@@ -71,6 +71,10 @@ typedef enum
 	PATCH_OTHER_VERSION, /* the app's own patch, made for another game version
 	                      * (e.g. installed before the game's update): replace */
 	PATCH_FOREIGN,       /* not written by the app, or changed since: ask first */
+	PATCH_SETTINGS,      /* the same patch, with other settings (SpotPass week or
+	                      * catalog mode, ipscfg.h): rewrite them. Set by probe.c,
+	                      * which compares the bytes; installed_classify() never
+	                      * returns it */
 } PatchState;
 
 /* Classify the code.ips on the SD.

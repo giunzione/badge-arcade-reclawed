@@ -54,6 +54,8 @@ int main(int argc, char **argv)
 	run("menu", test_menu);
 	run("manifest", test_manifest);
 	run("installed", test_installed);
+	run("ipscfg", test_ipscfg);
+	run("spotpass", test_spotpass);
 
 	printf("\n%d checks, %d failed\n", test_checks, test_failures);
 	return test_failures ? 1 : 0;

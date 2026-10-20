@@ -18,6 +18,8 @@
  *   Uninstall delete the patch from the SD (after a confirmation)
  *   Restart   restart the console, so Luma applies the new settings
  *   Exit      back to the HOME Menu / Homebrew Launcher (also START)
+ *   Machines  SpotPass week (boss.sarc) or the built-in catalog; the patch
+ *             is written with that choice and the week's first day
  */
 #include <stdio.h>
 #include <3ds.h>
@@ -56,6 +58,14 @@ static void test_log(void)
 	fprintf(f, "--- v%s checking=%d can_install=%d nothing_to_do=%d target=%d report=%d uninstall=%d\n",
 	        APP_VERSION, report.checking, report.can_install, report.nothing_to_do, report.target,
 	        report.report_target, report.uninstall_target);
+	if (report.target >= 0)
+	{
+		const SpotPassWeek *w = &state.game[report.target].spotpass;
+		fprintf(f, "spotpass=%s first=%04d-%02d-%02d days=%d machines=%d catalog=%d choice=%d sd_catalog=%d\n",
+		        spotpass_status_str(w->status), w->first_day.year, w->first_day.month,
+		        w->first_day.day, w->days, w->machines, state.game[report.target].catalog,
+		        report.catalog_choice, state.game[report.target].sd_catalog);
+	}
 	for (int i = 0; i < report.count; i++)
 		fprintf(f, "[%s] %s\n", levels[report.items[i].level], report.items[i].text);
 	fclose(f);
@@ -66,6 +76,7 @@ static void test_log(void)
 static void refresh(void)
 {
 	probe_system(&state);
+	state.want_builtin = menu.builtin_catalog;
 	probe_resolve(&state, job_started ? &job : NULL);
 	if (!job_started) /* no network at all: decide with the built-in patches now */
 	{
@@ -78,6 +89,20 @@ static void refresh(void)
 #ifdef RECLAWED_TEST_LOG
 	test_log();
 #endif
+
+	/* Once: start from the catalog the installed patch already uses, so the
+	 * menu shows the console's current choice. */
+	static bool catalog_synced;
+	int t = report.uninstall_target; /* the game whose code.ips is on the SD */
+	if (!catalog_synced && t >= 0 && state.game[t].sd_catalog >= 0)
+	{
+		catalog_synced = true;
+		if (state.game[t].sd_catalog == CATALOG_BUILTIN && !menu.builtin_catalog)
+		{
+			menu.builtin_catalog = true;
+			refresh();
+		}
+	}
 }
 
 static void add_line(const char *label, InstResult r, const char *msg)
@@ -218,6 +243,11 @@ static bool activate(MenuItem item)
 	case ITEM_RESTART: do_restart(); break;
 	case ITEM_EXIT: return false;
 	case ITEM_RESTART_AFTER: menu.restart_after_install = !menu.restart_after_install; break;
+	case ITEM_CATALOG:
+		/* The patch is written with the choice: probe again to compare. */
+		menu.builtin_catalog = !menu.builtin_catalog;
+		refresh();
+		break;
 	default: break;
 	}
 	return true;

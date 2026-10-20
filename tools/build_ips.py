@@ -10,13 +10,27 @@ Usage:
                                                                 # (game without update: build/<REGION>-noupdate/...)
     python3 tools/build_ips.py --set plays=25                   # override a [vars] value
     python3 tools/build_ips.py --set anchor_date=2018-07-20
+    python3 tools/build_ips.py --set catalog_mode=1             # built-in machines instead of boss.sarc
     python3 tools/build_ips.py --check code.bin                 # verify against YOUR decompressed .code
     python3 tools/build_ips.py --patch patches/other.toml --out somewhere/code.ips
+
+anchor_date and catalog_mode only set the defaults of the patch's settings
+block: the installer app rewrites that block for each console (see
+installer/source/ipscfg.h).
+
+Patch entries:
+    address        where the bytes go (virtual address in the .code)
+    asm            ARM assembly; may use ${var}
+    original       optional: the instruction expected there (checked by --check)
+    require_empty  optional: the bytes there must be zero (padding)
+    dead_code      optional: { size, sha256 } of a function the game never runs,
+                   whose bytes the patch replaces (checked by --check)
 
 Requires Python 3.11+ (tomllib) and keystone-engine (see requirements.txt).
 """
 import argparse
 import datetime
+import hashlib
 import os
 import string
 import sys
@@ -63,6 +77,8 @@ def resolve_vars(vars_):
             sys.exit('anchor_date must be a date (YYYY-MM-DD)')
         ms = (d - EPOCH).days * 86_400_000
         v.update(anchor_date=d.isoformat(), anchor_ms_lo=ms & 0xFFFFFFFF, anchor_ms_hi=ms >> 32)
+    if 'catalog_mode' in v and v['catalog_mode'] not in (0, 1):
+        sys.exit('catalog_mode must be 0 (SpotPass week, boss.sarc) or 1 (built-in machines)')
     v['week_ms'] = WEEK_MS
     return {k: str(x) for k, x in v.items()}
 
@@ -132,6 +148,9 @@ def main():
         addr = p['address']
         data = assemble(ks, subst(p['asm'], vars_, where), addr, where)
         desc = subst(p.get('description', ''), vars_, where)
+        dead = p.get('dead_code')
+        if dead is not None and len(data) > dead['size']:
+            sys.exit(f'{where}: {len(data)} bytes, more than the {dead["size"]}-byte function it replaces')
 
         for s, e in seen:
             if addr < e and s < addr + len(data):
@@ -143,6 +162,10 @@ def main():
             if p.get('require_empty') and any(cur):
                 errors += 1
                 print(f'  MISMATCH {addr:#x}: expected empty padding')
+            elif dead is not None:
+                if hashlib.sha256(code[addr - base: addr - base + dead['size']]).hexdigest() != dead['sha256'].lower():
+                    errors += 1
+                    print(f'  MISMATCH {addr:#x}: dead function bytes differ (sha256)')
             elif 'original' in p:
                 orig = assemble(ks, subst(p['original'], vars_, where), addr, where)
                 if code[addr - base: addr - base + len(orig)] != orig:

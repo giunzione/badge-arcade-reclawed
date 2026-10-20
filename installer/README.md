@@ -17,6 +17,7 @@ dot per check (green = ok, blue = will be done, yellow = warning, red = blocks t
 | Luma3DS | Luma keeps its files on the internal memory (CTRNAND) instead of the SD. If Luma isn't detected at all (e.g. in an emulator) it's only a warning |
 | Nintendo Badge Arcade | it isn't installed |
 | Patch | there is no patch for the exact game version installed (region + update version, or the base game's version without the update). The first button then becomes **Report** |
+| Machines | never. Which SpotPass week the game's `boss.sarc` holds, or that the built-in machines will be used (see [The SpotPass week and the machines](#the-spotpass-week-and-the-machines)) |
 | Patch on the SD | never. It's compared with the patch the app would install, using the record the app keeps next to it (see [Updates](#updates)) |
 | `config.ini` | it's missing or not in a format the app fully understands (see below) |
 
@@ -31,6 +32,9 @@ The bottom screen has the controls (D-Pad and <kbd>A</kbd>, or touch):
 
   With **Restart after install** ticked (the default) the console restarts after a
   3-second countdown, which can be cancelled.
+- **Machines** switches between the **SpotPass week** and the game's **built-in** machines.
+  It's only offered when `boss.sarc` is usable; without it the patch always uses the built-in ones.
+  It starts on what the installed patch uses. Switching makes **Install** rewrite the patch.
 - **Uninstall** deletes the patch (and its record) from the SD, after a confirmation. Game patching stays
   on, since other mods may rely on it.
 - **Restart** restarts the console, which is when Luma3DS applies the changes.
@@ -64,6 +68,29 @@ Which versions have a patch is decided only by `patches/*.toml`: each one names 
 code it fits (`code_title`, `code_version`), and `tools/make_manifest.py` turns the built
 patches into `patches.txt`.
 
+### The SpotPass week and the machines
+
+The patch folds the console's clock into one week of SpotPass data, so it has to know which
+week the console has. Every patch carries a 20-byte **settings block** (magic `RCLW` `CFG1`,
+the week's first day, the catalog mode; `source/ipscfg.h`). The app fills it in before
+writing `code.ips`. The values in the release file are only defaults.
+
+1. It opens the game's SD extdata (`extdata_id` in `source/titles.c`) and reads `boss.sarc`'s
+   header and its `Schedule.xml` (`source/spotpass.c`). The whole 25 MB archive is never read.
+2. The week starts on the `PrizeCollection` entry's `<DateStartText>` (else the earliest
+   `DefaultStage`). The app also counts the days that have machines.
+
+| `boss.sarc` | Shown | The patch gets |
+|---|---|---|
+| a full week | *SpotPass week from 2018-07-13* | that day as its anchor, mode 0 |
+| fewer than 7 days with machines | *SpotPass week 2018-07-13 (5 days only)* (warning) | the same |
+| missing | *No SpotPass data: built-in machines* | mode 1: the game's built-in machines |
+| damaged or without a schedule | e.g. *boss.sarc damaged: built-in machines* (warning) | mode 1 |
+| fine, but **Machines** set to built-in | *Built-in machines (your choice)* | mode 1 |
+
+A patch from before the settings block (an old release) shows *Old patch: SpotPass week can't
+be set*: it keeps its fixed week.
+
 ### Updates
 
 Every install also writes `sd:/luma/titles/<title id>/reclawed.txt` (Luma3DS ignores it):
@@ -82,6 +109,7 @@ install now (the latest release's, or its built-in one when offline):
 | the app's patch from an older release | *Update available: v0.4.0 -> v0.5.0*, button **Update** | replaces it |
 | the app's patch from a newer release (e.g. offline with an older app) | *Newer patch on SD (v0.5.0), kept* | never downgrades it |
 | the app's patch for another game version (e.g. installed before the game's update) | *Patch for another game version on SD* | replaces it |
+| the same patch with other settings (another SpotPass week, or **Machines** switched) | *Patch settings will change* | rewrites it. A newer patch kept on the SD gets its settings rewritten too |
 | a `code.ips` the app didn't write: no record, or the record's hash doesn't match (custom build, manual copy, edited file) | *Unknown patch on SD (asks to replace)* | asks first |
 
 Opening the app is enough to see whether a newer patch exists. Release tags compare as
@@ -148,6 +176,10 @@ python3 tests/fake_release.py newer      # then start the .3dsx in Azahar
 
 Azahar passes the app's network traffic to the PC, so `127.0.0.1` is the PC itself.
 
+For the SpotPass checks, put a `boss.sarc` in Azahar's emulated extdata, at
+`sdmc/Nintendo 3DS/<32 zeros>/<32 zeros>/extdata/00000000/00001536/user/boss.sarc` (EUR).
+The test log then also shows `spotpass=… first=… catalog=…`.
+
 `make compile_commands` does a clean build that also writes `build/compile_commands.json`
 for clangd and other editors.
 
@@ -172,6 +204,8 @@ for clangd and other editors.
 | `source/luma_config.c` | reads and edits the text of `config.ini` |
 | `source/luma_system.c` | asks the running Luma3DS for its version and options (3DS only) |
 | `source/fileops.c`, `source/ips.c` | file helpers and the IPS check |
+| `source/ipscfg.c` | the patch's settings block: find, read and write it, compare two patches apart from it |
+| `source/spotpass.c` | `boss.sarc`: the SARC lookup, the week in `Schedule.xml`, dates |
 | `tests/` | PC unit tests for everything except `main.c`, `ui.c`, `probe.c`, `online.c`, `net.c` and `luma_system.c` |
 | `gfx/` | images for the top screen, converted by tex3ds at build time: the Reclawed logo (made from `docs/logo.png`) and the small Divisione3DSAntimog "powered by" logo |
 | `meta/app.rsf` | makerom settings for the CIA (permissions, services) |

@@ -6,24 +6,26 @@
 #include <string.h>
 
 #define COLS 2
-#define ROWS 3
+#define ROWS 4
 
-/* Which item fills each cell; the toggle spans the last row. */
+/* Which item fills each cell; each toggle spans a whole row. */
 static const MenuItem GRID[ROWS][COLS] = {
 	{ITEM_INSTALL, ITEM_UNINSTALL},
 	{ITEM_RESTART, ITEM_EXIT},
 	{ITEM_RESTART_AFTER, ITEM_RESTART_AFTER},
+	{ITEM_CATALOG, ITEM_CATALOG},
 };
 
-/* Bottom screen geometry (pixels). */
+/* Bottom screen geometry (pixels). The help line is drawn at y = 222. */
 #define MARGIN  12
 #define GAP     12
 #define BTN_W   ((320 - 2 * MARGIN - GAP) / 2)
-#define BTN_H   52
-#define ROW0_Y  48
-#define ROW1_Y  (ROW0_Y + BTN_H + 10)
-#define TOGGLE_Y (ROW1_Y + BTN_H + 10)
-#define TOGGLE_H 30
+#define BTN_H   44
+#define ROW0_Y  44
+#define ROW1_Y  (ROW0_Y + BTN_H + 8)
+#define TOGGLE_Y (ROW1_Y + BTN_H + 8)
+#define TOGGLE_H 26
+#define TOGGLE2_Y (TOGGLE_Y + TOGGLE_H + 6)
 
 /* When the selected item gets disabled, go to the first usable of these. */
 static const MenuItem FALLBACK[] = {ITEM_INSTALL, ITEM_RESTART, ITEM_EXIT, ITEM_UNINSTALL};
@@ -43,6 +45,8 @@ void menu_update(Menu *m, const CheckReport *r, bool can_restart)
 	/* The first button is "Report" when the game has no patch for its version. */
 	m->enabled[ITEM_INSTALL] = install || r->report_target >= 0;
 	m->enabled[ITEM_RESTART_AFTER] = install;
+	/* Also when everything is installed: switching makes Install usable again. */
+	m->enabled[ITEM_CATALOG] = r->catalog_choice;
 	m->enabled[ITEM_UNINSTALL] = r->uninstall_target >= 0;
 	m->enabled[ITEM_RESTART] = can_restart;
 	m->enabled[ITEM_EXIT] = true;
@@ -113,6 +117,7 @@ MenuRect menu_item_rect(MenuItem item)
 	case ITEM_RESTART:   r = (MenuRect){MARGIN, ROW1_Y, BTN_W, BTN_H}; break;
 	case ITEM_EXIT:      r = (MenuRect){MARGIN + BTN_W + GAP, ROW1_Y, BTN_W, BTN_H}; break;
 	case ITEM_RESTART_AFTER: r = (MenuRect){MARGIN, TOGGLE_Y, 2 * BTN_W + GAP, TOGGLE_H}; break;
+	case ITEM_CATALOG:   r = (MenuRect){MARGIN, TOGGLE2_Y, 2 * BTN_W + GAP, TOGGLE_H}; break;
 	default: break;
 	}
 	return r;

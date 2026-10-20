@@ -116,6 +116,12 @@ static void dpad_moves(void)
 	CHECK(m.selected == ITEM_RESTART_AFTER);
 	menu_move(&m, 1, 0); /* the toggle spans the row: no change */
 	CHECK(m.selected == ITEM_RESTART_AFTER);
+	menu_move(&m, 0, 1);
+	CHECK(m.selected == ITEM_CATALOG);
+	menu_move(&m, 0, 1); /* bottom edge */
+	CHECK(m.selected == ITEM_CATALOG);
+	menu_move(&m, 0, -1);
+	CHECK(m.selected == ITEM_RESTART_AFTER);
 	menu_move(&m, 0, -1); /* up from the toggle: left column */
 	CHECK(m.selected == ITEM_RESTART);
 	menu_move(&m, 0, -1);
@@ -132,13 +138,44 @@ static void dpad_skips_disabled(void)
 	menu_init(&m);
 	m.enabled[ITEM_RESTART] = false;
 	m.enabled[ITEM_RESTART_AFTER] = false;
+	m.enabled[ITEM_CATALOG] = false;
 	m.selected = ITEM_INSTALL;
-	menu_move(&m, 0, 1); /* Restart and the toggle are off: nowhere to go */
+	menu_move(&m, 0, 1); /* Restart and both toggles are off: nowhere to go */
 	CHECK(m.selected == ITEM_INSTALL);
 
+	m.enabled[ITEM_CATALOG] = true;
+	menu_move(&m, 0, 1); /* jumps over Restart and the restart toggle */
+	CHECK(m.selected == ITEM_CATALOG);
+
 	m.enabled[ITEM_RESTART_AFTER] = true;
+	m.selected = ITEM_INSTALL;
 	menu_move(&m, 0, 1); /* jumps over Restart */
 	CHECK(m.selected == ITEM_RESTART_AFTER);
+}
+
+static void catalog_item(void)
+{
+	Menu m;
+	menu_init(&m);
+	CHECK(!m.builtin_catalog); /* SpotPass week unless the user picks otherwise */
+
+	/* Offered only when boss.sarc gives a choice, also when all is installed. */
+	CheckReport r = report(true, false, -1);
+	menu_update(&m, &r, true);
+	CHECK(!m.enabled[ITEM_CATALOG]);
+	r.catalog_choice = true;
+	menu_update(&m, &r, true);
+	CHECK(m.enabled[ITEM_CATALOG]);
+	r = report(true, true, 0);
+	r.catalog_choice = true;
+	menu_update(&m, &r, true);
+	CHECK(m.enabled[ITEM_CATALOG]);
+
+	/* Selected and then no longer offered: the selection moves off it. */
+	m.selected = ITEM_CATALOG;
+	r.catalog_choice = false;
+	menu_update(&m, &r, true);
+	CHECK(m.selected != ITEM_CATALOG && m.enabled[m.selected]);
 }
 
 static void touch_layout(void)
@@ -166,5 +203,6 @@ void test_menu(void)
 	selection_returns_to_install();
 	dpad_moves();
 	dpad_skips_disabled();
+	catalog_item();
 	touch_layout();
 }

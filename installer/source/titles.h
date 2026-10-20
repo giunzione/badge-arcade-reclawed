@@ -21,6 +21,10 @@ typedef struct
 	uint16_t update_version; /* title version of v1.3.1, the final update: only
 	                          * used to name it on screen; which versions have
 	                          * a patch comes from the manifest */
+	uint32_t extdata_id;     /* the game's SD extdata (boss.sarc lives there): its
+	                          * unique ID. EUR seen in Azahar and in
+	                          * badge-arcade-offline's patch, USA in Azahar;
+	                          * JPN not verified */
 } GameTitle;
 
 #define GAME_TITLE_COUNT 3

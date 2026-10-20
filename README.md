@@ -75,9 +75,9 @@ This case was found and tested by a French 3DS fan who reached out right after t
 
 ### Planned
 
-- **Installer app, next steps.** A listing on Universal-Updater, and a warning when the game's SpotPass data (`boss.sarc`) is missing.
-- **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
-- **Testing the USA and base-game patches on real hardware.** See [Supported game versions](#supported-game-versions).
+- **Installer app, next steps.** A listing on Universal-Updater.
+- **More built-in machines.** In built-in mode the game offers its default 30 machines. The game's own files hold about 400, and the installer could register them all on the console, from your own copy of the game.
+- **Testing on real hardware**: the USA and base-game patches, any SpotPass week other than the two below, and the built-in machines. See [Supported game versions](#supported-game-versions).
 - **JPN**: needs the game's code from someone who owns that version. Contributions are welcome.
 
 ---
@@ -87,8 +87,9 @@ This case was found and tested by a French 3DS fan who reached out right after t
 - A Nintendo 3DS / 2DS family console running **Luma3DS** custom firmware
 - **Nintendo Badge Arcade, EUR or USA**, either v1.3.1 (the final update) or the base game without the update.
   See [Supported game versions](#supported-game-versions). JPN is **not supported** yet, because the patch addresses differ.
-- Your console must still have the game's SpotPass data in its extdata (`boss.sarc`).
+- Best: the game's SpotPass data in its extdata (`boss.sarc`), for the machines of the last week you downloaded (a different lineup every day).
   This is the case if the game was opened at least once while the servers were up.
+  Without it, the installer app sets the patch to the game's **built-in machines** instead (the same 30 every day).
 - The console must be on its **Nintendo Network ID** account. If you use [Pretendo](https://pretendo.network) through Nimbus, switch back to **Nintendo** before launching the game.
 
 ---
@@ -100,9 +101,10 @@ This case was found and tested by a French 3DS fan who reached out right after t
 ### With the installer app (no PC needed)
 
 1. Connect the console to the internet, open **FBI**, choose **Remote Install → Scan QR Code** and scan the [QR code at the top of this page](#badge-arcade-reclawed). Confirm the install.
-2. Open **Reclawed Installer** from the HOME Menu. It checks your console and lists what it finds: Luma3DS, the game and its exact version, and Luma's settings. It also looks online for the newest patch for that version; without internet it uses the one built into the app. Anything that blocks the install is shown in red.
-3. Choose **Install**. The app copies the patch to `luma/titles/<title id>/code.ips` and turns on Luma's **"Enable game patching"** (after saving a backup of `luma/config.ini`), then restarts the console.
-4. Launch Nintendo Badge Arcade.
+2. Open **Reclawed Installer** from the HOME Menu. It checks your console and lists what it finds: Luma3DS, the game and its exact version, which SpotPass week your `boss.sarc` holds, and Luma's settings. It also looks online for the newest patch for that version; without internet it uses the one built into the app. Anything that blocks the install is shown in red.
+3. Optionally, pick the **Machines**: your **SpotPass week** (the default when `boss.sarc` is there) or the game's **built-in** ones.
+4. Choose **Install**. The app writes the patch, set up for your SpotPass week and your choice, to `luma/titles/<title id>/code.ips`, and turns on Luma's **"Enable game patching"** (after saving a backup of `luma/config.ini`). Then it restarts the console.
+5. Launch Nintendo Badge Arcade.
 
 The QR code always points to the newest release. Without a camera, download `reclawed-installer.cia` from the [latest release](https://github.com/giunzione/badge-arcade-reclawed/releases/latest) and install it from the SD card with FBI. The app's **Uninstall** button removes the patch again. When a new patch comes out, just open the app again: it shows **Update** in place of **Install**, and there's no need to reinstall the app.
 
@@ -116,6 +118,8 @@ If there's no patch for your version of the game yet, the app shows a **Report**
 
 To uninstall, delete `code.ips`. The installed game is never modified.
 
+A patch installed by hand uses its default SpotPass week: **2018-07-13** for EUR, **2019-01-10** for USA. If your `boss.sarc` holds another week, or you have none, use the installer app. It reads your week and sets the patch up for it. Or [build the patch](#building-from-source) with `--set anchor_date=…` / `--set catalog_mode=1`.
+
 > [!TIP]
 > The game takes **a long time to load**, especially on *Reading latest data...* after the title screen. On an Old 3DS with a slow SD card this can take about two minutes. Don't panic: it isn't frozen. The game reads its SpotPass badge data in many small pieces at every boot; that's the original game's behaviour, not the patch's.
 
@@ -128,7 +132,10 @@ pip install -r requirements.txt
 python3 tools/build_ips.py                              # defaults from the TOML [vars]
 python3 tools/build_ips.py --set plays=25               # override a variable
 python3 tools/build_ips.py --set anchor_date=2018-07-20 # if your boss.sarc covers another week
+python3 tools/build_ips.py --set catalog_mode=1         # the game's built-in machines, no boss.sarc needed
 ```
+
+`anchor_date` and `catalog_mode` are only the defaults of the patch's settings block: the installer app rewrites that block for each console ([04 – Time](docs/04-time.md#which-week-set-per-console)).
 
 The output goes to `build/<region>/luma/titles/<title id>/code.ips` (for EUR: `build/EUR/luma/titles/0004000000153600/code.ips`). If you dumped and decompressed your own `.code`, add `--check code.bin` to verify every original instruction before writing.
 
@@ -160,7 +167,13 @@ Limitations: quantities reset to 1, and HOME Menu shortcut badges become normal 
 The game can't find a Nintendo Network ID. You are probably on a Pretendo account: switch back to Nintendo with Nimbus.
 
 **The hall is empty or has no machines.**
-Your extdata doesn't contain `boss.sarc`. The patch can't provide machine data, because that data belongs to Nintendo.
+The patch was set up for another SpotPass week than the one in your `boss.sarc` (e.g. installed by hand). Run the installer app: it reads your week and fixes the patch, and shows **Patch settings will change**.
+
+**The game stops with an SD card error before the title screen.**
+Your extdata has no `boss.sarc`. Run the installer app: it switches the patch to the game's built-in machines. The patch can't bring back the SpotPass machines, because that data belongs to Nintendo.
+
+**Some badges are missing from the collection in built-in mode.**
+Built-in mode doesn't load the SpotPass badge catalog (`allbadge.sarc`), so badges that only came with SpotPass data may not be shown. They are still in your save.
 
 **Can you add other regions or versions?**
 Possibly. It needs the `.code` of that game version to locate the same functions. Contributions are welcome: add a `patches/<region>-<version>.toml` with its own `[meta] region`, `title_id`, `code_title` and `code_version`, and CI will build it, ship it as a separate zip and offer it to the installer app.
