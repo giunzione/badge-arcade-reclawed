@@ -44,6 +44,7 @@ Reclawed is built around a different idea: **the simplest possible way to get th
 | Daily machine rotation, with the real system clock | ✅ Working |
 | *Extra:* restoring old badges to the HOME Menu badge box | ✅ Optional side tool, [`tools/restore_badges.py`](tools/restore_badges.py) |
 | Keeping newly won badges after closing the game | ✅ Working. Stored in the game's extdata as `reclawed`, see [docs/05-home-badges.md](docs/05-home-badges.md) |
+| Won badges in the HOME Menu badge box right away, also when opened from the badge book (<kbd>Y</kbd>) | ✅ Working (confirmed on EUR v1.3.1) |
 | Theme shop, Miiverse gallery, info corner | ❔ Untested |
 | Installer app: install from the console with a QR code, no PC needed | 🆕 New, see [Installation](#installation) |
 
@@ -60,7 +61,7 @@ Reclawed is built around a different idea: **the simplest possible way to get th
 "Test harnesses" means every original instruction the patch replaces was checked against that version's code, and the patched code was run in a CPU emulator side by side with the EUR v1.3.1 patch, giving the same results. The installer app itself has so far been tested in the [Azahar](https://azahar-emu.org/) emulator. \
 If you try any 🧪 version on a real console, please [open an issue](https://github.com/giunzione/badge-arcade-reclawed/issues) and say whether it worked, with your console model and Luma3DS version.
 
-The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead, and sends the badges you win to the HOME Menu badge box at the end of each crane session.
+The original game stored your collection on Nintendo's servers. The patch keeps it in a local file instead, and writes the badges you win to the HOME Menu badge box during the short loading after the last pull of each crane session, just like the online game did while it waited for the server. They show up right away, whether you open the badge box from the HOME Menu or with <kbd>Y</kbd> in the game's badge book.
 
 ### Starting from scratch
 
@@ -75,9 +76,7 @@ This case was found and tested by a French 3DS fan who reached out right after t
 ### Planned
 
 - **Installer app, next steps.** A listing on Universal-Updater, and a warning when the game's SpotPass data (`boss.sarc`) is missing.
-- **Badges in the HOME Menu right away.** Today they appear in the badge box after you open the badge book once, or at the next launch. The export is already triggered at the end of each session; it only needs to run without waiting for the badge book.
 - **No more fixed schedule date.** The patch maps the clock onto the week stored in the `boss.sarc` it was built for. Reading that date from the game's own data at boot would make it work with any SpotPass week, without custom builds.
-- **Faster loading**, if possible. Some of the wait at boot may come from steps meant for the online service. To be investigated, no promises.
 - **Testing the USA and base-game patches on real hardware.** See [Supported game versions](#supported-game-versions).
 - **JPN**: needs the game's code from someone who owns that version. Contributions are welcome.
 
@@ -118,7 +117,7 @@ If there's no patch for your version of the game yet, the app shows a **Report**
 To uninstall, delete `code.ips`. The installed game is never modified.
 
 > [!TIP]
-> The game takes **a long time to load**, especially on the title screen. Don't panic: it isn't frozen, just give it a moment.
+> The game takes **a long time to load**, especially on *Reading latest data...* after the title screen. On an Old 3DS with a slow SD card this can take about two minutes. Don't panic: it isn't frozen. The game reads its SpotPass badge data in many small pieces at every boot; that's the original game's behaviour, not the patch's.
 
 ### Building from source
 
@@ -167,7 +166,7 @@ Your extdata doesn't contain `boss.sarc`. The patch can't provide machine data, 
 Possibly. It needs the `.code` of that game version to locate the same functions. Contributions are welcome: add a `patches/<region>-<version>.toml` with its own `[meta] region`, `title_id`, `code_title` and `code_version`, and CI will build it, ship it as a separate zip and offer it to the installer app.
 
 **I won a badge but it's not in the HOME Menu badge box.**
-Open the badge book in the game once, then check the badge box again. If you close the game first, the badges are added the next time you launch it.
+Badges are written to the HOME Menu during the short loading after the last pull of a session; don't turn the console off or press HOME during it. If you pressed HOME during that loading, the badges are added at the next session or the next time you launch the game.
 
 **The badges in the HOME Menu are in a strange order.**
 They are placed in the order you won them, not grouped by set. Nothing is lost, you can move them around in the badge box.

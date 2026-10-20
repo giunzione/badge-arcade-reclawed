@@ -39,13 +39,14 @@ The source of truth is [`patches/eur-v1.3.1.toml`](../patches/eur-v1.3.1.toml), 
 | 6 | `0x2EFB70`–`0x2EFB80` | 5 instructions | Hall: set network mode to 2 and jump to the "login OK" branch |
 | 7 | `0x2DFD2C`, `0x2DFD48` | `mov r0,#10` | Crane: read `Bonus_FreePlaySum` as 10 |
 | 8 | `0x304E88` | `mov r0,#1` | Practice Catcher: start request returns *success* |
-| 9 | `0x2E1490` | `bl` cave | Crane: end-of-session save returns *success* and exports won badges to the HOME Menu |
+| 9 | `0x2E1490` | `bl` cave | Crane: end-of-session save exports won badges to the HOME Menu, *pending* until they are written |
 | 10 | `0x305640` | `mov r0,#1` | Practice Catcher: result save returns *success* |
 | 10b | `0x3125A0` | `bl` cave | Tutorial crane (first play): end-of-session save, same as patch 9 |
 | 11 | `0x2B034C` → `0x3D79B0` | branch + 25-instruction cave | Remap the clock into the week of the cached schedule |
 | 12 | `0x2CDDB4` → `0x3D7A20` | call + cave | After each `savedata` write, save the progress blob to `extdata:/reclawed` |
 | 13 | (in the caves of 9, 10b and the boot load) | | Leave *new player* mode (network mode 0) once the player owns a badge |
 | 14 | `0x33F7CC`, `0x2D6398` → cave | branch / call | Load the saved badges once per boot: at title state `0x28`, or at hall entry if the boot skipped `0x28` |
+| 15 | `0x25163C` → cave | branch | HOME badge box from the game (Y in the badge book): reload the HOME badge data first, as the in-game badge box does |
 
 Patch 11's and 12's caves live in the zero padding at the end of `.text` (`0x3D79AC`–`0x3D8000`), which is mapped executable.
 
