@@ -35,6 +35,9 @@ jobs:
       - name: Installer unit tests
         run: make -C installer/tests
 
+      - name: SpotPass week tests (build_ips.py --spotpass)
+        run: python tools/test_spotpass_week.py
+
       - name: Variable override smoke test
         run: |
           for f in patches/*.toml; do

@@ -9,13 +9,15 @@ Usage:
     python3 tools/build_ips.py                                  # patches/eur-v1.3.1.toml -> build/EUR/...
                                                                 # (game without update: build/<REGION>-noupdate/...)
     python3 tools/build_ips.py --set plays=25                   # override a [vars] value
+    python3 tools/build_ips.py --spotpass path/to/boss.sarc     # play YOUR SpotPass week
     python3 tools/build_ips.py --check code.bin                 # verify against YOUR decompressed .code
     python3 tools/build_ips.py --patch patches/other.toml --out somewhere/code.ips
 
-The SpotPass week and the machines (SpotPass week / built-in) are not build
-options: the patch's settings block is written for each console by the
-installer app (installer/source/ipscfg.h). As built it selects the built-in
-machines, which work on any console.
+The patch's settings block says which machines the game plays (installer/
+source/ipscfg.h). As built it selects the game's built-in machines, which work
+on any console. With --spotpass, the week is read from your own boss.sarc
+(tools/spotpass_week.py, the same rules as the installer app) and the patch
+plays that week instead. The installer app does this on the console by itself.
 
 Patch entries:
     address        where the bytes go (virtual address in the .code)
@@ -43,10 +45,13 @@ except ImportError:
     sys.exit('keystone-engine is missing: pip install -r requirements.txt')
 
 from patch_meta import build_name    # tools/patch_meta.py: build/<name>/ folder per patch
+import spotpass_week                 # tools/spotpass_week.py: the week in a boss.sarc
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PATCH = os.path.join(ROOT, 'patches', 'eur-v1.3.1.toml')
 WEEK_MS = 7 * 24 * 60 * 60 * 1000       # the clock remap folds time into one week
+SETTINGS_MAGIC = b'RCLWCFG1'            # the settings block: magic, anchor (u64 ms), mode (u32)
+MODE_SPOTPASS = 0
 
 
 def parse_value(raw):
@@ -95,13 +100,38 @@ def build_ips(records, base):
     return bytes(out + b'EOF')
 
 
+def set_spotpass_week(records, week):
+    """Write anchor = `week` and the SpotPass mode into the one settings block
+    among `records` (found by its magic, as the installer does)."""
+    hits = [(i, at) for i, (_, data) in enumerate(records)
+            for at in range(0, len(data) - 19, 4) if data[at:at + 8] == SETTINGS_MAGIC]
+    if len(hits) != 1:
+        sys.exit(f'--spotpass: expected one settings block in the patch, found {len(hits)}')
+    i, at = hits[0]
+    addr, data = records[i]
+    block = SETTINGS_MAGIC + spotpass_week.date_ms(week).to_bytes(8, 'little') + MODE_SPOTPASS.to_bytes(4, 'little')
+    records[i] = (addr, data[:at] + block + data[at + 20:])
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--patch', default=DEFAULT_PATCH, help='patch definition (TOML)')
     ap.add_argument('--set', action='append', default=[], metavar='KEY=VALUE', help='override a [vars] value')
     ap.add_argument('--check', metavar='CODE_BIN', help='decompressed .code to verify original instructions')
     ap.add_argument('--out', help='output path (default: build/luma/titles/<title_id>/code.ips)')
+    ap.add_argument('--spotpass', metavar='BOSS_SARC',
+                    help="your game's boss.sarc: play its SpotPass week instead of the built-in machines")
     a = ap.parse_args()
+
+    week = None
+    if a.spotpass:
+        try:
+            week, days, machines = spotpass_week.read_week(a.spotpass)
+        except (OSError, spotpass_week.SpotPassError) as e:
+            sys.exit(f'--spotpass: {e}')
+        print(f'SpotPass week from {week.isoformat()}: {machines} machines on {days} of 7 days')
+        if days < 7:
+            print(f'  warning: only {days} days of that week have machines; the others will be empty')
 
     with open(a.patch, 'rb') as f:
         spec = tomllib.load(f)
@@ -161,6 +191,9 @@ def main():
     if errors:
         sys.exit(f'\n{errors} mismatch(es): wrong game region or version? Nothing written.')
 
+    if week is not None:
+        set_spotpass_week(records, week)
+
     region = meta.get('region', 'unknown')
     out = a.out or os.path.join(ROOT, 'build', build_name(meta), 'luma', 'titles', meta.get('title_id', 'unknown'), 'code.ips')
     ips = build_ips(records, base)
@@ -168,7 +201,8 @@ def main():
     with open(out, 'wb') as f:
         f.write(ips)
     shown = ', '.join(f'{k}={vars_[k]}' for k in spec.get('vars', {}))
-    print(f'\nWrote {out} ({region}, {len(ips)} bytes; {shown})')
+    machines = f'SpotPass week from {week.isoformat()}' if week else 'built-in machines'
+    print(f'\nWrote {out} ({region}, {len(ips)} bytes; {shown}; {machines})')
 
 
 if __name__ == '__main__':

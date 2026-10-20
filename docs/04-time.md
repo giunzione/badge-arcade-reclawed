@@ -41,7 +41,7 @@ Every console has the week it last downloaded, so the anchor can't be a constant
 2. The week's first day is the `<DateStartText>` of the `PrizeCollection` entry. Without one, it's the earliest `DefaultStage` start.
 3. It counts the `DefaultStage` entries in the 7 days from there. The two dumps checked so far both have 30 machines a day, every day: EUR `2018-07-13`, USA `2019-01-10`.
 
-There is no date in the TOMLs or the release files. As built, the block holds anchor 0 and catalog mode 1, the game's built-in machines ([02 – Boot sequence](02-boot-sequence.md#loadingdata-and-the-catalog-mode)): the one setting that works on any console. A patch copied by hand from a release zip runs like that. The installer switches it to mode 0 with the console's week whenever `boss.sarc` is usable, and leaves mode 1 otherwise.
+There is no date in the TOMLs or the release files. As built, the block holds anchor 0 and catalog mode 1, the game's built-in machines ([02 – Boot sequence](02-boot-sequence.md#loadingdata-and-the-catalog-mode)): the one setting that works on any console. A patch copied by hand from a release zip runs like that. The installer switches it to mode 0 with the console's week whenever `boss.sarc` is usable, and leaves mode 1 otherwise. A patch built on a PC does the same with `build_ips.py --spotpass <boss.sarc>`: `tools/spotpass_week.py` applies the installer's rules to a copy of the file, so both produce the same bytes.
 
 The built-in schedule runs from 2000 to 2030. In mode 1 the clock is still folded into the week from the anchor (2000-01-01 when there is none), so it always falls inside that range.
 
