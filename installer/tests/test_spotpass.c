@@ -136,7 +136,7 @@ static void week(void)
 	item(xml, sizeof(xml), "MessageDir", "20180713", "20180720");
 	for (int day = 13; day < 20; day++)
 	{
-		char a[9], b[9];
+		char a[24], b[24]; /* room for any int: gcc's -Wformat-truncation can't see day < 20 */
 		snprintf(a, sizeof(a), "201807%02d", day);
 		snprintf(b, sizeof(b), "201807%02d", day + 1);
 		for (int k = 0; k < 3; k++)
